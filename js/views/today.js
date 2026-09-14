@@ -30,7 +30,7 @@ function mustWinHtml(st) {
     <div class="mustwin ${done ? 'done' : ''}">
       <div class="row between">
         <span class="tag">${done ? '✓ Must Win' : '🔴 Must Win'}</span>
-        <button class="btn sm ghost" data-a="set-must" style="min-height:30px;padding:0 11px">Change</button>
+        <button class="btn sm ghost" data-a="set-must" style="min-height:34px;padding:0 12px">Change</button>
       </div>
       <div class="title wrap-any">${esc(st.must.title)}</div>
       <button class="btn block ${done ? 'ghost' : 'primary'}" data-a="toggle-must" style="margin-top:15px">
@@ -52,7 +52,7 @@ function salvageHtml(key) {
     <div class="card" style="border-color:rgba(106,166,255,.24);background:linear-gradient(155deg,rgba(106,166,255,.10),rgba(106,166,255,.02))">
       <div class="row between">
         <span class="tag" style="font-size:11.5px;font-weight:750;letter-spacing:.15em;text-transform:uppercase;color:#9CC4FF">🚨 Salvage mode</span>
-        <button class="btn sm ghost" data-a="salvage-off" style="min-height:30px;padding:0 11px">Exit</button>
+        <button class="btn sm ghost" data-a="salvage-off" style="min-height:34px;padding:0 12px">Exit</button>
       </div>
       <p class="muted" style="font-size:14.5px;margin-top:9px;line-height:1.5">
         Three moves and today counts. A bad day that keeps momentum beats starting over on Monday.
@@ -82,6 +82,9 @@ export default {
     const leisure = leisureStatus(key);
     const name = state.settings.name ? `, ${state.settings.name}` : '';
 
+    const fresh = !state.settings.welcomeDone && !state.projects.length
+      && !state.goals.length && !Object.keys(state.days).length;
+
     const bits = [];
     if (!st.must) bits.push('No Must Win yet');
     else bits.push(st.mustDone ? 'Must Win done' : 'Must Win open');
@@ -97,6 +100,35 @@ export default {
         <h1>${greeting(now.getHours())}${esc(name)}.</h1>
         <p class="sub">${esc(bits.join(' · '))}</p>
       </div>
+
+      ${fresh ? `
+        <div class="card" style="margin-bottom:14px;border-color:var(--line-strong)">
+          <div class="row between">
+            <div style="font-size:11.5px;font-weight:750;letter-spacing:.15em;text-transform:uppercase;color:var(--text-3)">Start here</div>
+            <button class="btn sm ghost" data-a="welcome-done" style="min-height:34px;padding:0 12px">Dismiss</button>
+          </div>
+          <p class="muted" style="font-size:14.5px;line-height:1.55;margin-top:10px">
+            Three things and the system is running. It stays this small every day.
+          </p>
+          <div class="stack" style="margin-top:13px">
+            <button class="linkrow" data-a="go-money">
+              <span class="ic">💰</span>
+              <span class="grow"><span class="t">1 · Set your current project</span><span class="d">The one thing you're building</span></span>
+              <span class="arrow">›</span>
+            </button>
+            <button class="linkrow" data-a="set-must">
+              <span class="ic">🔴</span>
+              <span class="grow"><span class="t">2 · Choose today's Must Win</span><span class="d">One thing. Not a list.</span></span>
+              <span class="arrow">›</span>
+            </button>
+            <button class="linkrow" data-a="go-plan">
+              <span class="ic">🌙</span>
+              <span class="grow"><span class="t">3 · Plan tomorrow tonight</span><span class="d">Two minutes, then you're done deciding</span></span>
+              <span class="arrow">›</span>
+            </button>
+          </div>
+          <p class="tiny dim" style="margin-top:12px">Everything else — faith, sleep, gym, social — is already set up in Settings. Adjust it whenever.</p>
+        </div>` : ''}
 
       ${bigWin ? `
         <button class="row between" data-a="go-sunday" style="width:100%;text-align:left;padding:11px 14px;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:10px">
@@ -348,6 +380,7 @@ export default {
       });
     });
 
+    bind(root, '[data-a="welcome-done"]', () => mutate(() => { state.settings.welcomeDone = true; }));
     bind(root, '[data-a="focus"]', () => openFocus());
     bind(root, '[data-a="go-money"]', () => go('money'));
     bind(root, '[data-a="go-plan"]', () => go('plan'));

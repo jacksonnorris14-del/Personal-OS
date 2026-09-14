@@ -4,16 +4,19 @@ import { state, mutate, taskById, setTaskDone, deleteTask, CATS } from './store.
 import { openSheet, confirmSheet, bind, toast } from './ui.js';
 import { esc, haptic, relDay, todayKey, tomorrowKey } from './util.js';
 
-export function taskRowHtml(t, { showDate = true } = {}) {
+export function taskRowHtml(t, { showDate = true, inProject = false } = {}) {
   const meta = [];
   if (showDate && t.date) meta.push(relDay(t.date));
-  else if (t.inbox) meta.push('Inbox');
-  if (t.kind === 'build') meta.push('Build');
-  if (t.kind === 'learn') meta.push('Learn');
-  const proj = state.projects.find((p) => p.id === t.projectId);
-  if (proj) meta.push(proj.name);
-  const goal = state.goals.find((g) => g.id === t.goalId);
-  if (goal && !proj) meta.push(goal.name);
+  else if (t.inbox && !inProject) meta.push('Inbox');
+  else if (inProject && !t.date) meta.push('Unscheduled');
+  if (!inProject) {
+    if (t.kind === 'build') meta.push('Build');
+    if (t.kind === 'learn') meta.push('Learn');
+    const proj = state.projects.find((p) => p.id === t.projectId);
+    if (proj) meta.push(proj.name);
+    const goal = state.goals.find((g) => g.id === t.goalId);
+    if (goal && !proj) meta.push(goal.name);
+  }
 
   return `
     <div class="check ${t.done ? 'on' : ''}" style="padding:0">
@@ -157,7 +160,7 @@ export function openTaskEditor(id) {
 
       sheet.querySelector('[data-x="del"]').onclick = async () => {
         close();
-        const ok = await confirmSheet({ title: 'Delete this?', sub: esc(t.title), confirmLabel: 'Delete', danger: true });
+        const ok = await confirmSheet({ title: 'Delete this?', sub: t.title, confirmLabel: 'Delete', danger: true });
         if (ok) { mutate(() => deleteTask(t.id)); toast('Deleted'); }
       };
     }

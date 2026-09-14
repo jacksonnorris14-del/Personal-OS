@@ -2,7 +2,7 @@
    Kept apart from storage so the rules stay readable and testable. */
 
 import { state, getDay, FAITH_KINDS, currentProject, taskById } from './store.js';
-import { dow, weekKeyOf, weekDays, addDays, todayKey, toMin, nowMin, daysBetween } from './util.js';
+import { dow, weekKeyOf, weekDays, addDays, todayKey, toMin, nowMin, fmtTime, daysBetween } from './util.js';
 
 /* ---------------- faith ---------------- */
 
@@ -193,10 +193,10 @@ export function rightNow(key = todayKey(), now = new Date()) {
   const proj = currentProject();
 
   if (m >= toMin(t.bedtime) || m < 5 * 60) {
-    return { icon: '😴', title: 'Sleep', why: `Lights-out target was ${t.bedtime}. Tomorrow starts tonight.`, intent: 'sleep' };
+    return { icon: '😴', title: 'Sleep', why: `Lights out at ${fmtTime(t.bedtime)}. Tomorrow starts tonight.`, intent: 'sleep' };
   }
   if (m >= toMin(t.phoneAway)) {
-    return { icon: '📵', title: 'Phone away', why: `Wind-down started at ${t.windDown}. Put it down and get ready for bed.`, intent: 'sleep' };
+    return { icon: '📵', title: 'Phone away', why: `Wind-down started at ${fmtTime(t.windDown)}. Put it down and get ready for bed.`, intent: 'sleep' };
   }
   if (d.salvage) {
     return { icon: '🚨', title: 'Salvage the day', why: 'Three small moves. That is all today needs.', intent: 'salvage' };
@@ -240,10 +240,12 @@ export function rangeStats(keys) {
   let mustSet = 0, mustDone = 0, secondSet = 0, secondDone = 0;
   let stdReq = 0, stdDone = 0, bed = 0, bedDays = 0, wake = 0;
   let faithDue = 0, faithDone = 0, money = 0, workouts = 0, social = 0, salvage = 0, planned = 0;
+  let records = 0;
 
   for (const k of keys) {
     const rec = state.days[k];
     if (!rec) continue;
+    records++;
     const st = dayStatus(k);
     if (rec.mustId) { mustSet++; if (st.mustDone) mustDone++; }
     secondSet += st.seconds.length;
@@ -260,7 +262,7 @@ export function rangeStats(keys) {
     if (rec.salvage) salvage++;
     if (rec.plannedAt) planned++;
   }
-  return { days: keys.length, mustSet, mustDone, secondSet, secondDone, stdReq, stdDone,
+  return { days: keys.length, records, mustSet, mustDone, secondSet, secondDone, stdReq, stdDone,
            bed, bedDays, wake, faithDue, faithDone, money, workouts, social, salvage, planned };
 }
 

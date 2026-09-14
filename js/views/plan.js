@@ -45,7 +45,7 @@ function planCard() {
           <div class="check sec" style="border-color:rgba(255,95,70,.28);background:linear-gradient(150deg,rgba(255,75,62,.10),rgba(255,75,62,.02))">
             <span class="lead">🔴</span>
             <span class="txt grow wrap-any">${esc(must.title)}</span>
-            <button class="btn sm ghost" data-a="p-must" style="min-height:32px;padding:0 11px">Change</button>
+            <button class="btn sm ghost" data-a="p-must" style="min-height:34px;padding:0 12px">Change</button>
           </div>`
         : `<button class="check" data-a="p-must" style="border-style:dashed">
              <span class="box" style="border-style:dashed">+</span>
@@ -60,7 +60,7 @@ function planCard() {
             <div class="check">
               <span class="lead">🟠</span>
               <span class="txt grow wrap-any">${esc(t.title)}</span>
-              <button class="btn sm ghost" data-a="p-drop" data-id="${t.id}" style="min-height:32px;padding:0 11px">Remove</button>
+              <button class="btn sm ghost" data-a="p-drop" data-id="${t.id}" style="min-height:34px;padding:0 12px">Remove</button>
             </div>`).join('')}
           ${seconds.length < 2 ? `
             <button class="check" data-a="p-second" style="border-style:dashed">

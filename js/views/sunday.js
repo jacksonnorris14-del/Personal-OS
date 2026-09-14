@@ -78,7 +78,7 @@ export default {
             <div class="check">
               <span class="lead">${n.day ? '📌' : '•'}</span>
               <span class="txt grow wrap-any">${esc(n.text)}${n.day ? `<span class="meta">${esc(fmtShort(n.day))}</span>` : ''}</span>
-              <button class="btn sm ghost" data-a="note-del" data-id="${n.id}" style="min-height:32px;padding:0 11px">✕</button>
+              <button class="btn sm ghost" data-a="note-del" data-id="${n.id}" style="min-height:34px;padding:0 12px">✕</button>
             </div>`).join('')}
           <div class="card" style="padding:12px">
             <input class="input" id="note-text" placeholder="Add: test, appointment, plans…" autocomplete="off" enterkeyhint="done">

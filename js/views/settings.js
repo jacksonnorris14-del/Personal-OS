@@ -236,7 +236,7 @@ export default {
           ${s.sunday.items.map((i) => `
             <div class="row between card" style="padding:12px 15px">
               <span class="grow tiny" style="font-size:14.5px">${esc(i.label)}<span class="d dim" style="display:block;font-size:12px">${i.group}</span></span>
-              <button class="btn sm ghost" data-sr-del="${i.id}" style="min-height:32px;padding:0 11px">✕</button>
+              <button class="btn sm ghost" data-sr-del="${i.id}" style="min-height:34px;padding:0 12px">✕</button>
             </div>`).join('')}
           <div class="card" style="padding:12px">
             <input class="input" id="sr-new" placeholder="Add a reset item" autocomplete="off" enterkeyhint="done">

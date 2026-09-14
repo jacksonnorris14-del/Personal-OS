@@ -190,18 +190,18 @@ export default {
         </div>` : ''}
 
       <div class="section">
-        <div class="label">🟢 Build <span class="hint">${builds.length}</span></div>
+        <div class="label">🟢 Build queue <span class="hint">${builds.length}</span></div>
         <div class="stack">
-          ${builds.length ? builds.map((t) => taskRowHtml(t, { showDate: true })).join('')
+          ${builds.length ? builds.map((t) => taskRowHtml(t, { inProject: true })).join('')
             : '<p class="dim tiny" style="padding:4px 2px">Nothing queued to build.</p>'}
           <button class="btn sm block ghost" data-a="add-build">+ Add build task</button>
         </div>
       </div>
 
       <div class="section">
-        <div class="label">🔵 Learn <span class="hint">${learns.length}</span></div>
+        <div class="label">🔵 Learn queue <span class="hint">${learns.length}</span></div>
         <div class="stack">
-          ${learns.length ? learns.map((t) => taskRowHtml(t, { showDate: true })).join('')
+          ${learns.length ? learns.map((t) => taskRowHtml(t, { inProject: true })).join('')
             : '<p class="dim tiny" style="padding:4px 2px">Nothing queued to learn.</p>'}
           <button class="btn sm block ghost" data-a="add-learn">+ Add learning task</button>
         </div>
@@ -210,7 +210,7 @@ export default {
       ${rest.length ? `
         <div class="section">
           <div class="label">Unsorted</div>
-          <div class="stack">${rest.map((t) => taskRowHtml(t)).join('')}</div>
+          <div class="stack">${rest.map((t) => taskRowHtml(t, { inProject: true })).join('')}</div>
         </div>` : ''}
 
       <div class="section">

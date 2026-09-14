@@ -64,7 +64,7 @@ function defaults() {
         ]
       },
       currentProjectId: null,
-      installHintSeen: false
+      welcomeDone: false
     },
     goals: [],
     projects: [],

@@ -72,6 +72,8 @@ export default {
 
     const cur = rangeStats(weekDays(wkKey).slice(0, elapsed));
     const prev = rangeStats(weekDays(prevKey).slice(0, elapsed));
+    // Last week with no records is not a baseline — showing a delta against it lies.
+    const d = (n) => (prev.records ? n : null);
     const w = getWeek(wkKey);
 
     const last30 = rangeStats(Array.from({ length: 30 }, (_, i) => addDays(today, -(29 - i))));
@@ -98,17 +100,17 @@ export default {
       </div>
 
       <div class="section">
-        <div class="label">This week so far <span class="hint">vs. same days last week</span></div>
+        <div class="label">This week so far ${prev.records ? '<span class="hint">vs. same days last week</span>' : ''}</div>
         <div class="stats2">
-          ${statTile('Must Wins', `${cur.mustDone}<small> / ${cur.mustSet || 0}</small>`, 'completed', cur.mustDone - prev.mustDone)}
+          ${statTile('Must Wins', `${cur.mustDone}<small> / ${cur.mustSet || 0}</small>`, 'completed', d(cur.mustDone - prev.mustDone))}
           ${statTile('Standards', `${cur.stdReq ? pct(cur.stdDone, cur.stdReq) : 0}<small>%</small>`, 'held',
-                     (cur.stdReq ? pct(cur.stdDone, cur.stdReq) : 0) - (prev.stdReq ? pct(prev.stdDone, prev.stdReq) : 0))}
-          ${statTile('Workouts', `${cur.workouts}<small> / ${state.settings.fitness.min}</small>`, cur.workouts >= state.settings.fitness.min ? 'minimum met' : 'minimum', cur.workouts - prev.workouts)}
-          ${statTile('Bedtime', `${cur.bed}<small> / ${elapsed}</small>`, 'on time', cur.bed - prev.bed)}
-          ${statTile('Wake-up', `${cur.wake}<small> / ${elapsed}</small>`, 'on target', cur.wake - prev.wake)}
-          ${statTile('Faith', `${cur.faithDone}<small> / ${cur.faithDue}</small>`, 'commitments', cur.faithDone - prev.faithDone)}
-          ${statTile('Money Engine', `${cur.money}<small> / ${elapsed}</small>`, 'active days', cur.money - prev.money)}
-          ${statTile('Social', `${cur.social}<small> / ${state.settings.social.min}</small>`, 'minimum', cur.social - prev.social)}
+                     d((cur.stdReq ? pct(cur.stdDone, cur.stdReq) : 0) - (prev.stdReq ? pct(prev.stdDone, prev.stdReq) : 0)))}
+          ${statTile('Workouts', `${cur.workouts}<small> / ${state.settings.fitness.min}</small>`, cur.workouts >= state.settings.fitness.min ? 'minimum met' : 'minimum', d(cur.workouts - prev.workouts))}
+          ${statTile('Bedtime', `${cur.bed}<small> / ${elapsed}</small>`, 'on time', d(cur.bed - prev.bed))}
+          ${statTile('Wake-up', `${cur.wake}<small> / ${elapsed}</small>`, 'on target', d(cur.wake - prev.wake))}
+          ${statTile('Faith', `${cur.faithDone}<small> / ${cur.faithDue}</small>`, 'commitments', d(cur.faithDone - prev.faithDone))}
+          ${statTile('Money Engine', `${cur.money}<small> / ${elapsed}</small>`, 'active days', d(cur.money - prev.money))}
+          ${statTile('Social', `${cur.social}<small> / ${state.settings.social.min}</small>`, 'minimum', d(cur.social - prev.social))}
         </div>
       </div>
 
