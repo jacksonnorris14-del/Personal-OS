@@ -2,7 +2,7 @@
    Three decisions, the third optional. Then it's done. */
 
 import { state, getDay, day, mutate, taskById } from '../store.js';
-import { faithFor, sleepTargets, workoutStats } from '../logic.js';
+import { faithFor, sleepTargets, workoutStats, rhythmFor } from '../logic.js';
 import { todayKey, tomorrowKey, dow, weekKeyOf, esc, fmtTime, haptic, sortBy, DOW_LONG } from '../util.js';
 import { bind, toast, emptyState, liveSave } from '../ui.js';
 import { taskRowHtml, bindTasks } from '../tasks-ui.js';
@@ -22,10 +22,13 @@ function planCard() {
   const w = workoutStats(weekKeyOf(key), todayKey());
   const gymFits = !state.settings.fitness.excluded.includes(dow(key)) && !w.metIdeal;
 
+  const rhythm = rhythmFor(key);
   const context = [];
+  if (rhythm?.school) context.push(`🏫 ${fmtTime(rhythm.school.start)}–${fmtTime(rhythm.school.end)}`);
   if (faith) context.push(`${faith.emoji} ${faith.label}`);
   if (gymFits) context.push(`💪 Gym fits (${w.done}/${w.min})`);
   context.push(`😴 ${fmtTime(sleep.bedtime)} → ${fmtTime(sleep.wake)}`);
+  const usual = (rhythm?.blocks || []).filter((b) => !b.soft).map((b) => b.label);
 
   return `
     <div class="card" style="padding:18px">
@@ -38,6 +41,7 @@ function planCard() {
       </div>
 
       <p class="tiny dim" style="margin-top:10px">${esc(context.join('  ·  '))}</p>
+      ${usual.length ? `<p class="tiny" style="margin-top:6px;color:var(--text-4)">Usually: ${esc(usual.join(' → '))}</p>` : ''}
 
       <div style="margin-top:18px">
         <div class="label" style="display:block;font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px">Step 1 — Must Win</div>
@@ -192,7 +196,7 @@ export default {
     bind(root, '[data-a="inbox-tom"]', (el) => mutate(() => {
       const t = taskById(el.dataset.id); if (t) { t.date = tomorrowKey(); t.inbox = false; }
     }));
-    bind(root, '[data-a="inbox-proj"]', (el) => { go('money', { fromIdea: el.dataset.id }); });
+    bind(root, '[data-a="inbox-proj"]', (el) => { go('business', { fromIdea: el.dataset.id }); });
 
     bind(root, '[data-a="new-task"]', () => openCapture({ when: 'today' }));
 

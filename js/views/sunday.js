@@ -2,8 +2,8 @@
    Ten to twenty minutes: clear the decks, then decide the one thing that
    would make the coming week a success. */
 
-import { state, getWeek, week, mutate, currentProject } from '../store.js';
-import { workoutStats, socialStats } from '../logic.js';
+import { state, getWeek, week, mutate, currentProject, reminderById } from '../store.js';
+import { workoutStats, socialStats, dueReminders, markReminderDone } from '../logic.js';
 import { todayKey, weekKeyOf, weekDays, dow, esc, haptic, DOW_SHORT, fmtShort, uid } from '../util.js';
 import { checkRow, bind, toast, liveSave } from '../ui.js';
 import { go } from '../app.js';
@@ -13,7 +13,7 @@ const GROUPS = [
   ['life',   '🧹 Life reset'],
   ['food',   '🍱 Food'],
   ['school', '📚 School'],
-  ['money',  '💰 Money Engine']
+  ['money',  '💼 Business']
 ];
 
 export default {
@@ -27,6 +27,7 @@ export default {
     const wo = workoutStats(wkKey, today);
     const soc = socialStats(wkKey);
     const plannedGym = w.plannedGym || [];
+    const due = dueReminders(today);
     const excluded = state.settings.fitness.excluded;
     const days = weekDays(wkKey);
 
@@ -40,6 +41,18 @@ export default {
       <div class="card">
         <div class="bar"><i style="width:${Math.round((doneCount / Math.max(1, items.length)) * 100)}%"></i></div>
       </div>
+
+      ${due.length ? `
+        <div class="section">
+          <div class="label">🔁 Due this week</div>
+          <div class="stack">
+            ${due.map(({ r, s: rs }) => checkRow({
+              id: r.id, label: r.label, emoji: r.emoji, on: false,
+              meta: rs.overdue > 0 ? `${rs.overdue} day${rs.overdue === 1 ? '' : 's'} overdue` : 'Due today',
+              attrs: 'data-a="rm-done"'
+            })).join('')}
+          </div>
+        </div>` : ''}
 
       ${GROUPS.map(([g, label]) => {
         const list = items.filter((i) => i.group === g);
@@ -138,6 +151,13 @@ export default {
   mount(root) {
     const wkKey = weekKeyOf(todayKey());
     let noteDay = null;
+
+    bind(root, '[data-a="rm-done"]', (el) => {
+      const r = reminderById(el.dataset.id);
+      if (!r) return;
+      haptic(14);
+      mutate(() => markReminderDone(r, todayKey()));
+    });
 
     bind(root, '[data-a="reset-item"]', (el) => {
       haptic();

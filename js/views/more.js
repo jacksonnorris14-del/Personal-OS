@@ -60,7 +60,7 @@ export default {
               ['📉', 'Minimum beats ideal. Ideal is a bonus, never the bar.'],
               ['🔁', 'Miss once, return. Never miss twice.'],
               ['🚨', 'A salvaged day beats a restart on Monday.'],
-              ['🟢', 'Build before learn. Output compounds; research does not.'],
+              ['🟢', 'Build before learn. Park the reading; output compounds.'],
               ['🌙', 'Decide tonight so tomorrow is execution.'],
               ['😌', 'Rest is earned, not forbidden. Intentional rest is not avoidance.']
             ].map(([e, t]) => `<li class="row" style="gap:11px;align-items:flex-start">

@@ -11,7 +11,7 @@ const el = () => document.getElementById('focus');
 
 const INTENTS = {
   must:   { emoji: '🎯', label: 'My Must Win' },
-  money:  { emoji: '💰', label: 'Money Engine' },
+  money:  { emoji: '💼', label: 'Business' },
   school: { emoji: '📚', label: 'School' },
   build:  { emoji: '💻', label: 'Build something' },
   learn:  { emoji: '📖', label: 'Learn / research' },

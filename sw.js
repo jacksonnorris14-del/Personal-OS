@@ -1,5 +1,5 @@
 /* Personal OS service worker — offline-first, self-updating. */
-const VERSION = 'pos-v1';
+const VERSION = 'pos-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -16,7 +16,7 @@ const ASSETS = [
   './js/focus.js',
   './js/views/today.js',
   './js/views/plan.js',
-  './js/views/money.js',
+  './js/views/business.js',
   './js/views/goals.js',
   './js/views/tasks.js',
   './js/views/more.js',
@@ -65,19 +65,22 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Everything else: cache first, refresh in the background.
+  // Everything else: network first, cache as the offline fallback.
+  //
+  // Cache-first used to serve stale modules against a freshly fetched
+  // index.html, so the shell and its JS could drift apart — a renamed route
+  // then left a nav button pointing at a view the loaded code had never heard
+  // of. The app is a handful of small files behind a CDN, so paying a network
+  // round trip to keep them in lockstep is the right trade.
   e.respondWith(
-    caches.match(req).then((hit) => {
-      const net = fetch(req)
-        .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(VERSION).then((c) => c.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => hit);
-      return hit || net;
-    })
+    fetch(req)
+      .then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(VERSION).then((c) => c.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req))
   );
 });

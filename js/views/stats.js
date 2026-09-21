@@ -109,7 +109,7 @@ export default {
           ${statTile('Bedtime', `${cur.bed}<small> / ${elapsed}</small>`, 'on time', d(cur.bed - prev.bed))}
           ${statTile('Wake-up', `${cur.wake}<small> / ${elapsed}</small>`, 'on target', d(cur.wake - prev.wake))}
           ${statTile('Faith', `${cur.faithDone}<small> / ${cur.faithDue}</small>`, 'commitments', d(cur.faithDone - prev.faithDone))}
-          ${statTile('Money Engine', `${cur.money}<small> / ${elapsed}</small>`, 'active days', d(cur.money - prev.money))}
+          ${statTile('Business', `${cur.money}<small> / ${elapsed}</small>`, 'active days', d(cur.money - prev.money))}
           ${statTile('Social', `${cur.social}<small> / ${state.settings.social.min}</small>`, 'minimum', d(cur.social - prev.social))}
         </div>
       </div>
@@ -146,7 +146,7 @@ export default {
         <div class="stats2">
           ${statTile('Must Wins', `${last30.mustDone}<small> / ${last30.mustSet}</small>`, 'completed')}
           ${statTile('Workouts', `${last30.workouts}`, 'sessions')}
-          ${statTile('Money Engine', `${last30.money}<small> / 30</small>`, 'active days')}
+          ${statTile('Business', `${last30.money}<small> / 30</small>`, 'active days')}
           ${statTile('Bedtime', `${last30.bedDays ? pct(last30.bed, last30.bedDays) : 0}<small>%</small>`, 'consistency')}
           ${statTile('Nights planned', `${last30.planned}`, 'evenings')}
           ${statTile('Focus', `${Math.round(focus7 / 60 * 10) / 10}<small>h</small>`, 'last 7 days')}

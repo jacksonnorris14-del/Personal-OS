@@ -21,7 +21,7 @@ export function pickTask({ title = 'Choose a task', sub = '', dateKey = null, ex
     const bits = [];
     if (t.date) bits.push(relDay(t.date));
     else if (t.inbox) bits.push('Inbox');
-    if (t.projectId && t.projectId === proj?.id) bits.push('Money Engine');
+    if (t.projectId && t.projectId === proj?.id) bits.push('Business');
     else if (t.cat && t.cat !== 'other') bits.push(CATS[t.cat].label);
     return `
       <button class="linkrow" data-pick="${t.id}">

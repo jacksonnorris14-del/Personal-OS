@@ -2,8 +2,9 @@
    One Must Win, up to two Secondary Wins, the standards that apply to *this*
    day, and the few numbers that matter. Nothing else competes for attention. */
 
-import { state, getDay, getWeek, day, mutate, taskById, setTaskDone, currentProject } from '../store.js';
-import { dayStatus, standardsFor, toggleStandard, nudgeFor, sleepTargets, workoutStats, socialStats, leisureStatus } from '../logic.js';
+import { state, getDay, getWeek, day, mutate, taskById, setTaskDone, currentProject, reminderById } from '../store.js';
+import { dayStatus, standardsFor, toggleStandard, nudgeFor, sleepTargets, workoutStats, socialStats,
+         leisureStatus, dueReminders, markReminderDone, rhythmFor, schoolPhase } from '../logic.js';
 import { todayKey, tomorrowKey, dow, weekKeyOf, esc, fmtTime, toMin, nowMin, haptic, DOW_LONG } from '../util.js';
 import { checkRow, pips, bind, toast, confirmSheet } from '../ui.js';
 import { pickTask, scheduleTask } from '../pick.js';
@@ -15,6 +16,48 @@ function greeting(h) {
   if (h < 17) return 'Good afternoon';
   if (h < 21) return 'Good evening';
   return 'Late night';
+}
+
+const BLOCK_ICON = { money: '💼', gym: '💪', school: '📚', faith: '✝️', social: '👥', flex: '🟢', rest: '😌' };
+
+/** The day's usual shape. Suggestions only — nothing here is tracked or scored. */
+function rhythmHtml(key, now) {
+  const r = rhythmFor(key);
+  if (!r || (!r.school && !r.blocks.length)) return '';
+  const phase = schoolPhase(key, now);
+  const d = getDay(key);
+
+  const done = (b) => (b.kind === 'money' && d.money) || (b.kind === 'gym' && d.workout)
+    || (b.kind === 'faith' && d.faith) || (b.kind === 'social' && d.social);
+
+  return `
+    <div class="section">
+      <div class="label">Today's shape <span class="hint">just a suggestion</span></div>
+      <div class="card">
+        ${r.school ? `
+          <div class="row between" style="padding-bottom:12px;border-bottom:1px solid var(--line)">
+            <span class="row" style="gap:8px">
+              <span style="font-size:15px">🏫</span>
+              <span style="font-weight:620;font-size:14.5px">${fmtTime(r.school.start)} – ${fmtTime(r.school.end)}</span>
+            </span>
+            <span class="tiny ${phase === 'during' ? '' : 'dim'}" style="${phase === 'during' ? 'color:var(--school)' : ''}">
+              ${phase === 'before' ? 'not yet' : phase === 'during' ? 'in school now' : 'done for the day'}
+            </span>
+          </div>` : ''}
+        <div class="stack" style="margin-top:${r.school ? '12px' : '0'};gap:9px">
+          ${r.blocks.map((b) => `
+            <div class="row" style="gap:10px;align-items:flex-start;${done(b) ? 'opacity:.45' : ''}">
+              <span style="width:20px;font-size:14px;flex:none">${BLOCK_ICON[b.kind] || '•'}</span>
+              <span class="grow" style="min-width:0">
+                <span style="font-size:14px;font-weight:${b.soft ? '480' : '560'};${done(b) ? 'text-decoration:line-through' : ''}">${esc(b.label)}</span>
+                ${b.soft ? '<span class="tiny dim"> · if it fits</span>' : ''}
+              </span>
+              <span class="tiny dim" style="flex:none">${esc(b.when || '')}</span>
+            </div>`).join('')}
+        </div>
+        ${r.note ? `<p class="tiny dim" style="margin-top:11px">${esc(r.note)}</p>` : ''}
+      </div>
+    </div>`;
 }
 
 function mustWinHtml(st) {
@@ -79,6 +122,7 @@ export default {
     const bigWin = wk.bigWin;
     const bigWinDone = wk.bigWinDone;
     const soc = socialStats(wkKey);
+    const due = dueReminders(key);
     const leisure = leisureStatus(key);
     const name = state.settings.name ? `, ${state.settings.name}` : '';
 
@@ -173,6 +217,20 @@ export default {
           </div>
         </div>`}
 
+      ${d.salvage ? '' : rhythmHtml(key, now)}
+
+      ${due.length ? `
+        <div class="section">
+          <div class="label">Reminders <span class="hint">${due.length} due</span></div>
+          <div class="stack">
+            ${due.map(({ r, s: rs }) => checkRow({
+              id: r.id, label: r.label, emoji: r.emoji, on: false,
+              meta: rs.overdue > 0 ? `${rs.overdue} day${rs.overdue === 1 ? '' : 's'} overdue` : 'Due today',
+              attrs: 'data-a="reminder-done"'
+            })).join('')}
+          </div>
+        </div>` : ''}
+
       <div class="section">
         <div class="label">Daily standards ${d.salvage ? '<span class="hint">optional today</span>' : st.held ? '<span class="hint">all held ✓</span>' : ''}</div>
         <div class="stack">
@@ -235,10 +293,10 @@ export default {
       </div>
 
       <div class="section">
-        <div class="label">Money Engine</div>
+        <div class="label">Business</div>
         ${proj ? `
           <div class="engine">
-            <div class="tag">💰 Current project</div>
+            <div class="tag">💼 Current project</div>
             <div class="name wrap-any">${esc(proj.name)}</div>
             <p class="muted" style="font-size:14px;margin-top:8px">
               ${d.money ? 'Moved forward today. That is the whole game — consistently.' : 'What can you do today to move it forward?'}
@@ -249,7 +307,7 @@ export default {
             </div>
           </div>`
         : `<button class="card" data-a="go-money" style="width:100%;text-align:left;border-style:dashed">
-             <div style="font-size:11.5px;font-weight:750;letter-spacing:.15em;text-transform:uppercase;color:var(--text-3)">💰 Money Engine</div>
+             <div style="font-size:11.5px;font-weight:750;letter-spacing:.15em;text-transform:uppercase;color:var(--text-3)">💼 Business</div>
              <div style="font-size:16px;font-weight:620;margin-top:6px">Set your current project</div>
              <div class="tiny dim" style="margin-top:4px">One project at a time. It should always be obvious what you're building.</div>
            </button>`}
@@ -380,9 +438,17 @@ export default {
       });
     });
 
+    bind(root, '[data-a="reminder-done"]', (el) => {
+      const r = reminderById(el.dataset.id);
+      if (!r) return;
+      haptic(14);
+      mutate(() => markReminderDone(r, key));
+      toast('Done — back in the rotation');
+    });
+
     bind(root, '[data-a="welcome-done"]', () => mutate(() => { state.settings.welcomeDone = true; }));
     bind(root, '[data-a="focus"]', () => openFocus());
-    bind(root, '[data-a="go-money"]', () => go('money'));
+    bind(root, '[data-a="go-money"]', () => go('business'));
     bind(root, '[data-a="go-plan"]', () => go('plan'));
     bind(root, '[data-a="go-sunday"]', () => go('sunday'));
   }
