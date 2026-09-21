@@ -2,13 +2,13 @@
    One versioned object in localStorage. Everything the app knows lives here,
    which keeps a future cloud sync to a single read/write seam. */
 
-import { uid, todayKey } from './util.js';
+import { uid, todayKey, weekKeyOf, addDays, dow } from './util.js';
 
 const KEY = 'personal-os';
-const SCHEMA = 1;
+const SCHEMA = 2;
 
 export const CATS = {
-  money:  { label: 'Money',  emoji: '💰', color: 'var(--money)' },
+  money:  { label: 'Business', emoji: '💼', color: 'var(--money)' },
   school: { label: 'School', emoji: '📚', color: 'var(--school)' },
   faith:  { label: 'Faith',  emoji: '✝️', color: 'var(--faith)' },
   health: { label: 'Health', emoji: '💪', color: 'var(--health)' },
@@ -22,6 +22,12 @@ export const FAITH_KINDS = {
   church:   { label: 'Church',               emoji: '⛪' },
   group:    { label: 'Morning Bible Study',  emoji: '👥' }
 };
+
+/** The next time this weekday comes around (today counts if it matches). */
+function upcoming(weekday = 0) {
+  const t = todayKey();
+  return dow(t) === weekday ? t : addDays(weekKeyOf(t), weekday + 7);
+}
 
 function defaults() {
   return {
@@ -41,11 +47,46 @@ function defaults() {
       fitness: { min: 3, ideal: 4, excluded: [0], preferred: 'morning' },
       social: { min: 1, ideal: 2 },
       school: { days: [1, 2, 3, 4, 5] },
+      /* How a typical week usually runs. Shown as a quiet suggestion on Today
+         and when planning — never enforced, never scored. index 0 = Sunday. */
+      rhythm: [
+        { school: null, note: '', blocks: [
+          { kind: 'faith', when: 'Morning', label: 'Church' },
+          { kind: 'flex',  when: 'Afternoon', label: 'Sunday Reset + set up the week' }
+        ] },
+        { school: { start: '08:40', end: '14:15' }, note: '', blocks: [
+          { kind: 'money',  when: 'Before school', label: 'Business work' },
+          { kind: 'gym',    when: 'After school',  label: 'Gym' },
+          { kind: 'school', when: 'Evening',       label: 'Work / homework' }
+        ] },
+        { school: { start: '09:25', end: '15:00' }, note: '', blocks: [
+          { kind: 'gym',    when: 'Morning',      label: 'Gym' },
+          { kind: 'money',  when: 'After school', label: 'Business work' }
+        ] },
+        { school: { start: '08:00', end: '13:40' }, note: '', blocks: [
+          { kind: 'money',  when: 'Before school', label: 'A little business work' },
+          { kind: 'gym',    when: 'After school',  label: 'Gym', soft: true }
+        ] },
+        { school: { start: '10:15', end: '15:00' }, note: 'Bible study 8:45', blocks: [
+          { kind: 'faith',  when: '8:45',         label: 'Bible study' },
+          { kind: 'money',  when: 'Late morning', label: 'Business work — or gym, your call' },
+          { kind: 'school', when: 'After school', label: 'Work / homework' },
+          { kind: 'gym',    when: 'After school', label: 'Gym if you skipped Wed', soft: true }
+        ] },
+        { school: { start: '08:00', end: '13:50' }, note: '', blocks: [
+          { kind: 'money',  when: 'Before school', label: 'Business work' },
+          { kind: 'money',  when: 'After school',  label: 'More business work', soft: true },
+          { kind: 'social', when: 'Tonight',       label: 'Friends / wind down', soft: true }
+        ] },
+        { school: null, note: '', blocks: [
+          { kind: 'flex', when: 'All day', label: 'Balance — some work, some fun, not all of either' }
+        ] }
+      ],
       priorities: ['money', 'school', 'faith', 'health', 'social'],
       standards: [
         { id: 'std-faith',  type: 'faith',  emoji: '✝️', label: 'Faith commitment', days: [0,1,2,3,4,5,6], required: true },
         { id: 'std-school', type: 'school', emoji: '📚', label: 'School handled',   days: [1,2,3,4,5],     required: true },
-        { id: 'std-money',  type: 'money',  emoji: '💰', label: 'Moved the Money Engine', days: [0,1,2,3,4,5,6], required: true },
+        { id: 'std-money',  type: 'money',  emoji: '💼', label: 'Moved the business forward', days: [0,1,2,3,4,5,6], required: true },
         { id: 'std-move',   type: 'move',   emoji: '💪', label: 'Workout or movement',    days: [0,1,2,3,4,5,6], required: false }
       ],
       sunday: {
@@ -69,6 +110,13 @@ function defaults() {
     goals: [],
     projects: [],
     tasks: [],
+    /* Recurring upkeep. Only surfaces on the days it is actually due. */
+    reminders: [
+      { id: 'rm-linens', emoji: '🛏️', label: 'Change towel, pillowcase, floor mat',
+        mode: 'weekly', every: 2, days: [0], anchor: upcoming(0), lastDone: null, createdKey: todayKey() },
+      { id: 'rm-shampoo', emoji: '🚿', label: 'Shampoo hair',
+        mode: 'interval', every: 4, days: [], anchor: null, lastDone: null, createdKey: todayKey() }
+    ],
     days: {},   // key -> day record
     weeks: {},  // sunday key -> week record
     focus: []   // completed focus sessions
@@ -115,6 +163,13 @@ function migrate(raw) {
   }
   if (!Array.isArray(s.standards) || !s.standards.length) s.standards = base.settings.standards;
   if (!Array.isArray(s.priorities) || s.priorities.length !== 5) s.priorities = base.settings.priorities;
+  if (!Array.isArray(s.rhythm) || s.rhythm.length !== 7) s.rhythm = base.settings.rhythm;
+  // "Money Engine" was renamed; existing installs carry the old wording.
+  s.standards = s.standards.map((st) => (
+    st.type === 'money' && /money engine/i.test(st.label || '')
+      ? { ...st, emoji: '💼', label: 'Moved the business forward' }
+      : st
+  ));
   return {
     ...base,
     ...raw,
@@ -123,6 +178,7 @@ function migrate(raw) {
     goals: raw.goals || [],
     projects: raw.projects || [],
     tasks: raw.tasks || [],
+    reminders: Array.isArray(raw.reminders) ? raw.reminders : base.reminders,
     days: raw.days || {},
     weeks: raw.weeks || {},
     focus: raw.focus || []
@@ -272,6 +328,31 @@ export function deleteProject(id) {
 
 export const currentProject = () =>
   state.projects.find((p) => p.id === state.settings.currentProjectId) || null;
+
+/* ---------------- reminders ---------------- */
+
+export function newReminder(patch = {}) {
+  const r = {
+    id: uid(),
+    emoji: '🔁',
+    label: '',
+    mode: 'interval',   // 'interval' (every N days) | 'weekly' (every N weeks on chosen days)
+    every: 7,
+    days: [],
+    anchor: weekKeyOf(todayKey()),
+    lastDone: null,
+    createdKey: todayKey(),
+    ...patch
+  };
+  state.reminders.push(r);
+  return r;
+}
+
+export const reminderById = (id) => state.reminders.find((r) => r.id === id) || null;
+
+export function deleteReminder(id) {
+  state.reminders = state.reminders.filter((r) => r.id !== id);
+}
 
 /* ---------------- export / import ---------------- */
 

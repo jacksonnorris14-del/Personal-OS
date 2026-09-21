@@ -1,5 +1,5 @@
 /* Personal OS service worker — offline-first, self-updating. */
-const VERSION = 'pos-v1';
+const VERSION = 'pos-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -16,7 +16,7 @@ const ASSETS = [
   './js/focus.js',
   './js/views/today.js',
   './js/views/plan.js',
-  './js/views/money.js',
+  './js/views/business.js',
   './js/views/goals.js',
   './js/views/tasks.js',
   './js/views/more.js',

@@ -10,8 +10,7 @@ export function taskRowHtml(t, { showDate = true, inProject = false } = {}) {
   else if (t.inbox && !inProject) meta.push('Inbox');
   else if (inProject && !t.date) meta.push('Unscheduled');
   if (!inProject) {
-    if (t.kind === 'build') meta.push('Build');
-    if (t.kind === 'learn') meta.push('Learn');
+    if (t.kind === 'learn') meta.push('Learning');
     const proj = state.projects.find((p) => p.id === t.projectId);
     if (proj) meta.push(proj.name);
     const goal = state.goals.find((g) => g.id === t.goalId);
@@ -85,11 +84,10 @@ export function openTaskEditor(id) {
       </div>
 
       <div class="field">
-        <span class="lab">Build or learn</span>
+        <span class="lab">Type</span>
         <div class="chips">
-          <button class="chip ${t.kind === 'build' ? 'on' : ''}" data-k="build">🟢 Build</button>
-          <button class="chip ${t.kind === 'learn' ? 'on' : ''}" data-k="learn">🔵 Learn</button>
-          <button class="chip ${!t.kind ? 'on' : ''}" data-k="">Neither</button>
+          <button class="chip ${t.kind !== 'learn' ? 'on' : ''}" data-k="">📋 Task to do</button>
+          <button class="chip ${t.kind === 'learn' ? 'on' : ''}" data-k="learn">📖 Something to learn</button>
         </div>
       </div>
 

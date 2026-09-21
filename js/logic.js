@@ -86,7 +86,7 @@ export function standardsFor(key) {
     }
 
     if (st.type === 'money') {
-      // Sunday's Money Engine work is the review inside Sunday Reset.
+      // Sunday's business work is the review inside Sunday Reset.
       out.push({ ...st, done: !!d.money, field: 'money', required: st.required !== false && wd !== 0 });
       continue;
     }
@@ -157,7 +157,7 @@ export function nudgeFor(key) {
     if (t) return { icon: '✝️', text: `Missed ${yFaith.label.toLowerCase()} yesterday. Today's ${t.label.toLowerCase()} brings it back.` };
   }
   if (!yd.money && (yd.mustId || yd.plannedAt)) {
-    return { icon: '💰', text: 'No Money Engine progress yesterday. Ten honest minutes today resets the pattern.' };
+    return { icon: '💼', text: 'No business work yesterday. Ten honest minutes today resets the pattern.' };
   }
   return null;
 }
@@ -181,6 +181,105 @@ export function buildLearnBalance(days = 14, ref = todayKey()) {
   return { build, learn, total: build + learn };
 }
 
+/* ---------------- recurring reminders ----------------
+   Upkeep that repeats on its own clock: every N days, or every N weeks on a
+   chosen day. A reminder only appears once it is actually due, and stays until
+   it is done — missing Sunday doesn't erase it, it just carries. */
+
+/** The most recent date on or before `key` that this reminder was due. */
+export function lastDueOn(r, key) {
+  if (r.mode === 'weekly') {
+    const every = Math.max(1, r.every || 1);
+    const days = r.days?.length ? r.days : [0];
+    const anchor = r.anchor || r.createdKey || key;
+    for (let i = 0; i <= every * 7 + 7; i++) {
+      const d = addDays(key, -i);
+      if (!days.includes(dow(d))) continue;
+      const weeks = Math.floor(daysBetween(weekKeyOf(anchor), weekKeyOf(d)) / 7);
+      if (weeks >= 0 && weeks % every === 0) return d;
+    }
+    return null;
+  }
+  // interval: due every N days from the last time it was done
+  const every = Math.max(1, r.every || 1);
+  const base = r.lastDone || r.createdKey;
+  if (!base) return key;
+  if (!r.lastDone) return base <= key ? base : null;
+  const gap = daysBetween(base, key);
+  if (gap < every) return null;
+  return addDays(base, Math.floor(gap / every) * every);
+}
+
+export function reminderState(r, key = todayKey()) {
+  const due = lastDueOn(r, key);
+  const isDue = !!due && (!r.lastDone || r.lastDone < due);
+  return {
+    due: isDue,
+    dueOn: due,
+    overdue: isDue && due ? daysBetween(due, key) : 0,
+    lastDone: r.lastDone
+  };
+}
+
+/** Reminders that want attention on this day, most overdue first. */
+export function dueReminders(key = todayKey()) {
+  return (state.reminders || [])
+    .map((r) => ({ r, s: reminderState(r, key) }))
+    .filter((x) => x.s.due)
+    .sort((a, b) => b.s.overdue - a.s.overdue);
+}
+
+/** When this reminder next comes around, for display in settings. */
+export function nextDueText(r, key = todayKey()) {
+  const st = reminderState(r, key);
+  if (st.due) return st.overdue > 0 ? `Due — ${st.overdue}d late` : 'Due today';
+  if (r.mode === 'interval') {
+    const next = addDays(r.lastDone || key, Math.max(1, r.every || 1));
+    const inDays = daysBetween(key, next);
+    return inDays <= 0 ? 'Due today' : inDays === 1 ? 'Due tomorrow' : `Due in ${inDays} days`;
+  }
+  for (let i = 1; i <= (r.every || 1) * 7 + 7; i++) {
+    const d = addDays(key, i);
+    const last = lastDueOn(r, d);
+    if (last === d) return i === 1 ? 'Due tomorrow' : `Due in ${i} days`;
+  }
+  return '';
+}
+
+export function markReminderDone(r, key = todayKey()) {
+  r.lastDone = key;
+}
+
+/** Plain-English summary of the schedule, e.g. "Every 4 days". */
+export function reminderRule(r) {
+  const n = Math.max(1, r.every || 1);
+  if (r.mode === 'interval') return n === 1 ? 'Every day' : `Every ${n} days`;
+  const names = (r.days?.length ? r.days : [0]).map((d) => DOW_LONG_LOCAL[d]).join(', ');
+  return n === 1 ? `Every ${names}` : n === 2 ? `Every other ${names}` : `Every ${n} weeks on ${names}`;
+}
+
+const DOW_LONG_LOCAL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/* ---------------- the shape of a normal day ----------------
+   Baseline suggestions drawn from how the week usually runs. Advisory only:
+   nothing here is checked off, scored, or held against you. */
+
+export function rhythmFor(key) {
+  const r = state.settings.rhythm?.[dow(key)];
+  if (!r) return null;
+  return { school: r.school || null, note: r.note || '', blocks: r.blocks || [] };
+}
+
+/** Where the day currently sits relative to school, if there is school. */
+export function schoolPhase(key, now = new Date()) {
+  const r = rhythmFor(key);
+  if (!r?.school) return 'none';
+  const m = nowMin(now);
+  if (m < toMin(r.school.start)) return 'before';
+  if (m <= toMin(r.school.end)) return 'during';
+  return 'after';
+}
+
 /* ---------------- "what should I be doing right now?" ----------------
    The doomscroll interrupt: one honest answer, based on the clock and
    what's still open. */
@@ -201,16 +300,40 @@ export function rightNow(key = todayKey(), now = new Date()) {
   if (d.salvage) {
     return { icon: '🚨', title: 'Salvage the day', why: 'Three small moves. That is all today needs.', intent: 'salvage' };
   }
+  const rhythm = rhythmFor(key);
+  const phase = schoolPhase(key, now);
+
+  if (phase === 'during') {
+    return {
+      icon: '🏫', title: 'You\'re at school',
+      why: `Out at ${fmtTime(rhythm.school.end)}. Nothing here needs deciding until then.`,
+      intent: 'school'
+    };
+  }
   if (st.must && !st.must.done) {
     return { icon: '🔴', title: st.must.title, why: 'This is today\'s Must Win. Everything else is negotiable.', intent: 'must' };
   }
+
+  // Before school, lean on whatever this day usually opens with.
+  if (phase === 'before') {
+    const first = rhythm.blocks.find((b) => !b.soft && ['money', 'gym', 'faith'].includes(b.kind));
+    if (first && !(first.kind === 'money' && d.money) && !(first.kind === 'gym' && d.workout)) {
+      return {
+        icon: first.kind === 'gym' ? '💪' : first.kind === 'faith' ? '✝️' : '💼',
+        title: first.label,
+        why: `This is usually how ${DOW_LONG_LOCAL[dow(key)]} starts. School at ${fmtTime(rhythm.school.start)}.`,
+        intent: first.kind === 'gym' ? 'gym' : first.kind === 'faith' ? 'other' : 'money'
+      };
+    }
+  }
+
   if (!d.school && state.settings.school.days.includes(dow(key)) && m < 21 * 60) {
     return { icon: '📚', title: 'School responsibilities', why: 'Not handled yet today.', intent: 'school' };
   }
   if (!d.money) {
     return {
-      icon: '💰', title: proj ? proj.name : 'Money Engine',
-      why: proj ? 'No progress logged today. Ten minutes counts.' : 'Set a current project so this always has an answer.',
+      icon: '💼', title: proj ? proj.name : 'Business work',
+      why: proj ? 'No work logged today. Ten minutes counts.' : 'Set a current project so this always has an answer.',
       intent: 'money'
     };
   }
