@@ -13,6 +13,11 @@ import stats from './views/stats.js';
 import settings from './views/settings.js';
 import sunday from './views/sunday.js';
 
+/* Tells the shell in index.html that the matching build actually booted, so a
+   stale-module mismatch can be detected and healed rather than sitting broken.
+   Must match __POS_BUILD in index.html — bump both together on every release. */
+window.__POS_READY = 4;
+
 const VIEWS = { today, plan, business, goals, more, stats, settings, sunday };
 const TABS = { today: 'today', plan: 'plan', business: 'business', goals: 'goals',
                more: 'more', stats: 'more', settings: 'more', sunday: 'more' };
