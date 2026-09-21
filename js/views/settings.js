@@ -1,12 +1,13 @@
 /* SETTINGS — the system bends to your life, not the other way around. */
 
-import { state, mutate, FAITH_KINDS } from '../store.js';
-import { esc, haptic, uid, DOW_SHORT, DOW_LONG } from '../util.js';
+import { state, mutate, FAITH_KINDS, newReminder, reminderById, deleteReminder } from '../store.js';
+import { esc, haptic, uid, DOW_SHORT, DOW_LONG, fmtTime, todayKey, weekKeyOf } from '../util.js';
+import { reminderRule, nextDueText } from '../logic.js';
 import { openSheet, confirmSheet, bind, toast, liveSave } from '../ui.js';
 import { go } from '../app.js';
 
 const PRIO_META = {
-  money:  { emoji: '💰', label: 'Money / Business' },
+  money:  { emoji: '💼', label: 'Business' },
   school: { emoji: '📚', label: 'School' },
   faith:  { emoji: '✝️', label: 'Faith' },
   health: { emoji: '💪', label: 'Health / Fitness' },
@@ -95,6 +96,175 @@ function standardEditor(id) {
         if (await confirmSheet({ title: 'Remove standard?', sub: st.label, confirmLabel: 'Remove', danger: true })) {
           mutate(() => { state.settings.standards = state.settings.standards.filter((x) => x.id !== st.id); });
         }
+      };
+    }
+  });
+}
+
+function reminderEditor(id) {
+  const r = id ? reminderById(id) : null;
+  const mode = r?.mode || 'interval';
+  openSheet({
+    title: r ? 'Edit reminder' : 'New reminder',
+    sub: r ? '' : 'Something that repeats on its own clock.',
+    body: `
+      <div class="field">
+        <span class="lab">What is it?</span>
+        <input class="input" id="rm-label" data-autofocus value="${esc(r?.label || '')}"
+               placeholder="e.g. Change guitar strings" autocomplete="off">
+      </div>
+      <div class="field">
+        <span class="lab">Emoji</span>
+        <input class="input" id="rm-emoji" value="${esc(r?.emoji || '🔁')}" maxlength="4" style="width:90px">
+      </div>
+
+      <div class="field">
+        <span class="lab">How often</span>
+        <div class="seg">
+          <button class="${mode === 'interval' ? 'on' : ''}" data-m="interval">Every N days</button>
+          <button class="${mode === 'weekly' ? 'on' : ''}" data-m="weekly">On certain days</button>
+        </div>
+      </div>
+
+      <div class="field" id="rm-interval" ${mode === 'weekly' ? 'hidden' : ''}>
+        <span class="lab">Repeat every</span>
+        <div class="row" style="gap:10px">
+          <button class="btn sm ghost" data-a="ev-" style="min-width:44px">−</button>
+          <b id="rm-n1" style="min-width:34px;text-align:center;font-size:17px">${r?.mode !== 'weekly' ? (r?.every || 4) : 4}</b>
+          <button class="btn sm ghost" data-a="ev+" style="min-width:44px">+</button>
+          <span class="tiny dim">days</span>
+        </div>
+        <p class="tiny dim" style="margin-top:9px">Counts from the day you last did it, not a fixed calendar slot.</p>
+      </div>
+
+      <div class="field" id="rm-weekly" ${mode === 'interval' ? 'hidden' : ''}>
+        <span class="lab">On these days</span>
+        <div class="chips">
+          ${DOW_SHORT.map((dn, i) => `<button class="chip ${(r?.days || [0]).includes(i) ? 'on' : ''}" data-rd="${i}">${dn}</button>`).join('')}
+        </div>
+        <span class="lab" style="margin-top:14px">Every</span>
+        <div class="row" style="gap:10px">
+          <button class="btn sm ghost" data-a="wk-" style="min-width:44px">−</button>
+          <b id="rm-n2" style="min-width:34px;text-align:center;font-size:17px">${r?.mode === 'weekly' ? (r?.every || 1) : 1}</b>
+          <button class="btn sm ghost" data-a="wk+" style="min-width:44px">+</button>
+          <span class="tiny dim">week(s)</span>
+        </div>
+        <p class="tiny dim" style="margin-top:9px">Set 2 for every other week — it counts from this week onward.</p>
+      </div>
+
+      <div class="actions">
+        ${r ? '<button class="btn danger" data-x="del">Delete</button>' : ''}
+        <button class="btn primary" data-x="save">Save</button>
+      </div>`,
+    onMount(sheet, close) {
+      let m = mode;
+      let nInterval = r?.mode !== 'weekly' ? (r?.every || 4) : 4;
+      let nWeekly = r?.mode === 'weekly' ? (r?.every || 1) : 1;
+      let days = [...(r?.days || [0])];
+
+      const syncMode = () => {
+        sheet.querySelector('#rm-interval').hidden = m !== 'interval';
+        sheet.querySelector('#rm-weekly').hidden = m !== 'weekly';
+        sheet.querySelectorAll('[data-m]').forEach((x) => x.classList.toggle('on', x.dataset.m === m));
+      };
+      sheet.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => { m = b.dataset.m; haptic(); syncMode(); });
+      sheet.querySelectorAll('[data-rd]').forEach((b) => b.onclick = () => {
+        const i = Number(b.dataset.rd);
+        days = days.includes(i) ? days.filter((x) => x !== i) : [...days, i].sort();
+        b.classList.toggle('on');
+      });
+      const bump = (which, delta) => {
+        if (which === 'i') { nInterval = Math.max(1, Math.min(365, nInterval + delta)); sheet.querySelector('#rm-n1').textContent = nInterval; }
+        else { nWeekly = Math.max(1, Math.min(12, nWeekly + delta)); sheet.querySelector('#rm-n2').textContent = nWeekly; }
+        haptic();
+      };
+      sheet.querySelector('[data-a="ev+"]').onclick = () => bump('i', 1);
+      sheet.querySelector('[data-a="ev-"]').onclick = () => bump('i', -1);
+      sheet.querySelector('[data-a="wk+"]').onclick = () => bump('w', 1);
+      sheet.querySelector('[data-a="wk-"]').onclick = () => bump('w', -1);
+
+      sheet.querySelector('[data-x="save"]').onclick = () => {
+        const label = sheet.querySelector('#rm-label').value.trim();
+        if (!label) { toast('Give it a name'); return; }
+        if (m === 'weekly' && !days.length) { toast('Pick at least one day'); return; }
+        const patch = {
+          label,
+          emoji: sheet.querySelector('#rm-emoji').value.trim() || '🔁',
+          mode: m,
+          every: m === 'interval' ? nInterval : nWeekly,
+          days: m === 'weekly' ? days : []
+        };
+        mutate(() => {
+          if (r) Object.assign(r, patch);
+          else newReminder({ ...patch, anchor: weekKeyOf(todayKey()) });
+        });
+        close();
+      };
+      const del = sheet.querySelector('[data-x="del"]');
+      if (del) del.onclick = async () => {
+        close();
+        if (await confirmSheet({ title: 'Delete reminder?', sub: r.label, confirmLabel: 'Delete', danger: true })) {
+          mutate(() => deleteReminder(r.id));
+          toast('Deleted');
+        }
+      };
+    }
+  });
+}
+
+function rhythmEditor(dayIndex) {
+  const r = state.settings.rhythm[dayIndex];
+  openSheet({
+    title: DOW_LONG[dayIndex],
+    sub: 'Baseline only — the app suggests, it never enforces.',
+    body: `
+      <div class="field">
+        <span class="lab">School hours</span>
+        <div class="chips" style="margin-bottom:10px">
+          <button class="chip ${r.school ? 'on' : ''}" data-sc="1">Has school</button>
+          <button class="chip ${!r.school ? 'on' : ''}" data-sc="0">No school</button>
+        </div>
+        <div class="grid2" id="rh-times" ${r.school ? '' : 'hidden'}>
+          <label><span class="lab">Starts</span><input type="time" class="input" id="rh-start" value="${r.school?.start || '08:00'}"></label>
+          <label><span class="lab">Ends</span><input type="time" class="input" id="rh-end" value="${r.school?.end || '15:00'}"></label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="lab">Note for this day</span>
+        <input class="input" id="rh-note" value="${esc(r.note || '')}" placeholder="e.g. Bible study 8:45" autocomplete="off">
+      </div>
+      <div class="field">
+        <span class="lab">Usual blocks</span>
+        <div class="stack" id="rh-blocks">
+          ${r.blocks.map((b, i) => `
+            <div class="row between card" style="padding:11px 13px">
+              <span class="grow tiny" style="font-size:14px">${esc(b.label)}<span class="d dim" style="display:block;font-size:12px">${esc(b.when || '')}${b.soft ? ' · if it fits' : ''}</span></span>
+              <button class="btn sm ghost" data-rb-del="${i}" style="min-height:34px;padding:0 12px">✕</button>
+            </div>`).join('') || '<p class="tiny dim">No blocks — the day is wide open.</p>'}
+        </div>
+      </div>
+      <div class="actions"><button class="btn primary block" data-x="save">Save</button></div>`,
+    onMount(sheet, close) {
+      let hasSchool = !!r.school;
+      let blocks = r.blocks.map((b) => ({ ...b }));
+      sheet.querySelectorAll('[data-sc]').forEach((b) => b.onclick = () => {
+        hasSchool = b.dataset.sc === '1';
+        sheet.querySelectorAll('[data-sc]').forEach((x) => x.classList.toggle('on', x === b));
+        sheet.querySelector('#rh-times').hidden = !hasSchool;
+      });
+      sheet.querySelectorAll('[data-rb-del]').forEach((b) => b.onclick = () => {
+        blocks.splice(Number(b.dataset.rbDel), 1);
+        b.closest('.row').remove();
+      });
+      sheet.querySelector('[data-x="save"]').onclick = () => {
+        mutate(() => {
+          r.school = hasSchool
+            ? { start: sheet.querySelector('#rh-start').value || '08:00', end: sheet.querySelector('#rh-end').value || '15:00' }
+            : null;
+          r.note = sheet.querySelector('#rh-note').value.trim();
+          r.blocks = blocks;
+        });
+        close();
       };
     }
   });
@@ -213,6 +383,39 @@ export default {
       </div>
 
       <div class="section">
+        <div class="label">🔁 Recurring reminders <span class="hint">shown only when due</span></div>
+        <div class="stack">
+          ${(state.reminders || []).map((r) => `
+            <button class="linkrow" data-rm="${r.id}">
+              <span class="ic">${r.emoji}</span>
+              <span class="grow">
+                <span class="t">${esc(r.label)}</span>
+                <span class="d">${esc(reminderRule(r))} · ${esc(nextDueText(r))}</span>
+              </span>
+              <span class="arrow">›</span>
+            </button>`).join('')}
+          <button class="btn sm block ghost" data-a="new-rm">+ Add a reminder</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="label">🗓️ Weekly rhythm <span class="hint">suggestions only</span></div>
+        <div class="stack">
+          ${s.rhythm.map((r, i) => `
+            <button class="linkrow" data-rh="${i}">
+              <span class="grow">
+                <span class="t">${DOW_LONG[i]}</span>
+                <span class="d">${r.school ? `School ${fmtTime(r.school.start)}–${fmtTime(r.school.end)}` : 'No school'}${r.blocks.length ? ` · ${r.blocks.length} block${r.blocks.length === 1 ? '' : 's'}` : ''}</span>
+              </span>
+              <span class="arrow">›</span>
+            </button>`).join('')}
+        </div>
+        <p class="tiny dim" style="margin-top:9px;padding:0 2px">
+          Used for gentle nudges on Today and when planning. Never scored, never enforced.
+        </p>
+      </div>
+
+      <div class="section">
         <div class="label">Daily standards</div>
         <div class="stack">
           ${s.standards.map((st) => `
@@ -306,6 +509,10 @@ export default {
       [s.priorities[i + 1], s.priorities[i]] = [s.priorities[i], s.priorities[i + 1]];
       haptic();
     }));
+
+    bind(root, '[data-rm]', (el) => reminderEditor(el.dataset.rm));
+    bind(root, '[data-a="new-rm"]', () => reminderEditor(null));
+    bind(root, '[data-rh]', (el) => rhythmEditor(Number(el.dataset.rh)));
 
     bind(root, '[data-std]', (el) => standardEditor(el.dataset.std));
     bind(root, '[data-a="new-std"]', () => standardEditor(null));

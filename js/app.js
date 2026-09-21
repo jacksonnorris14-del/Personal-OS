@@ -6,15 +6,15 @@ import { openCapture } from './capture.js';
 
 import today from './views/today.js';
 import plan from './views/plan.js';
-import money from './views/money.js';
+import business from './views/business.js';
 import goals from './views/goals.js';
 import more from './views/more.js';
 import stats from './views/stats.js';
 import settings from './views/settings.js';
 import sunday from './views/sunday.js';
 
-const VIEWS = { today, plan, money, goals, more, stats, settings, sunday };
-const TABS = { today: 'today', plan: 'plan', money: 'money', goals: 'goals',
+const VIEWS = { today, plan, business, goals, more, stats, settings, sunday };
+const TABS = { today: 'today', plan: 'plan', business: 'business', goals: 'goals',
                more: 'more', stats: 'more', settings: 'more', sunday: 'more' };
 
 let current = 'today';
@@ -76,8 +76,25 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 history.replaceState({ view: 'today', params: {} }, '');
 render();
 
+/* Updates land on their own: a new worker takes over and the page reloads once,
+   so opening the app is all it takes to be on the latest version. */
 if ('serviceWorker' in navigator) {
+  // On a first-ever visit the worker claims an uncontrolled page, which is not
+  // an update — reloading for that would just flash the app on launch.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is a bonus */ });
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // Check for a new build whenever the app comes back to the foreground.
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) reg.update().catch(() => {});
+      });
+    }).catch(() => { /* offline support is a bonus */ });
   });
 }

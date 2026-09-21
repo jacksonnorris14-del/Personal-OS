@@ -11,9 +11,9 @@ LONG-TERM GOALS  →  CURRENT PROJECT  →  THIS WEEK'S BIG WIN  →  TODAY'S MU
 
 | Screen | Purpose |
 | --- | --- |
-| **Today** | One Must Win, up to two Secondary Wins, the standards that apply to *this* day, sleep targets, weekly workout and social counts, the Money Engine, and Salvage mode. |
+| **Today** | One Must Win, up to two Secondary Wins, the day's usual shape, any reminders that are due, the standards that apply to *this* day, sleep targets, weekly workout and social counts, the current project, and Salvage mode. |
 | **Plan** | Tomorrow in three decisions (the third optional), plus Today / Upcoming / Inbox / Done task lists. |
-| **Money** | One current project, always with a visible next action, and a Build-vs-Learn balance over the last 14 days. |
+| **Business** | One current project — a name is enough. Shows the last 7 days of logged work (derived, nothing to fill in) and a learning list to park reading in so it doesn't eat build time. |
 | **Goals** | Long-term outcomes with category, priority, target date, and status. Direction, not a to-do list. |
 | **More** | History and trends, Sunday Reset, Settings, and backup/restore. |
 | **Capture** (＋) | Anywhere, any time. One field, defaults to the Inbox so nothing demands a decision mid-thought. |
@@ -28,6 +28,8 @@ LONG-TERM GOALS  →  CURRENT PROJECT  →  THIS WEEK'S BIG WIN  →  TODAY'S MU
 - **Build before learn.** Research is allowed; output is what the app keeps score of.
 - **Earned leisure, without guilt.** When the mission is handled, the app says so plainly.
 - **No points, levels, streaks, or shame scores.** Just what happened, so patterns are visible.
+- **Reminders appear only when due.** Recurring upkeep repeats on its own clock — every N days, or every N weeks on chosen days — and carries over if missed rather than silently resetting.
+- **The weekly rhythm suggests, never enforces.** Typical school hours and how each day usually runs inform Today's shape and the "what should I be doing right now?" answer. Nothing in it is tracked or scored.
 
 Standards adapt to the day: the faith row shows the commitment actually scheduled
 (personal study, church, or group study), school is quiet on weekends, movement is only
