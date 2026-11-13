@@ -4,11 +4,8 @@
 <meta charset="utf-8">
 <title>Personal OS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
-<meta name="description" content="A personal command center: today's mission, daily standards, and the long game.">
-<meta name="theme-color" content="#08090B">
+<meta name="theme-color" content="#04050A">
 <meta name="color-scheme" content="dark">
-
-<!-- iOS home-screen app -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,48 +13,36 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32">
 <link rel="manifest" href="manifest.webmanifest">
-
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
 
-<main id="screen" role="main"></main>
+<canvas id="sky"></canvas>
 
-<button id="fab" aria-label="Capture a thought">＋</button>
+<button id="menu" aria-label="More">
+  <span></span><span></span><span></span>
+</button>
 
-<nav id="nav" aria-label="Primary">
-  <button data-nav="today" aria-current="page"><span class="ic">🎯</span>Today</button>
-  <button data-nav="plan"><span class="ic">📅</span>Plan</button>
-  <button data-nav="business"><span class="ic">💼</span>Business</button>
-  <button data-nav="goals"><span class="ic">🏔️</span>Goals</button>
-  <button data-nav="more"><span class="ic">📊</span>More</button>
-</nav>
-
-<div id="sheets" aria-live="polite"></div>
-<div id="focus"></div>
+<div id="sheet"></div>
 <div id="toast" role="status"></div>
 
 <script>
-// Build sentinel. index.html is served network-first, so this value is always
-// current; app.js reports the build it was compiled against. If they disagree
-// (or app.js never boots), an older service worker is serving stale modules —
-// clear everything once and reload so the app can never sit in a broken state.
-//
+// Build sentinel — index.html is always fetched fresh, app.js reports the build
+// it was compiled against. A mismatch means stale modules: clear and reload once.
 // BUMP THIS AND __POS_READY IN js/app.js TOGETHER ON EVERY RELEASE.
-window.__POS_BUILD = 4;
-window.addEventListener('load', function () {
+window.__POS_BUILD = 5;
+addEventListener('load', function () {
   setTimeout(function () {
     if (window.__POS_READY === window.__POS_BUILD) return;
-    if (sessionStorage.getItem('pos-healing')) return;   // only ever once per launch
+    if (sessionStorage.getItem('pos-healing')) return;
     sessionStorage.setItem('pos-healing', '1');
     var done = function () { location.reload(); };
     Promise.resolve()
       .then(function () { return caches ? caches.keys().then(function (k) {
         return Promise.all(k.map(function (n) { return caches.delete(n); })); }) : null; })
-      .then(function () {
-        return navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) {
-          return Promise.all(rs.map(function (r) { return r.unregister(); })); }) : null;
-      })
+      .then(function () { return navigator.serviceWorker
+        ? navigator.serviceWorker.getRegistrations().then(function (rs) {
+            return Promise.all(rs.map(function (r) { return r.unregister(); })); }) : null; })
       .then(done, done);
   }, 2000);
 });

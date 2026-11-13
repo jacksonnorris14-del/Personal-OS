@@ -2,7 +2,7 @@
    Kept apart from storage so the rules stay readable and testable. */
 
 import { state, getDay, FAITH_KINDS, currentProject, taskById } from './store.js';
-import { dow, weekKeyOf, weekDays, addDays, todayKey, toMin, nowMin, fmtTime, daysBetween } from './util.js';
+import { dow, weekKeyOf, weekDays, addDays, todayKey, toMin, nowMin, fmtTime, daysBetween, DOW_LONG } from './util.js';
 
 /* ---------------- faith ---------------- */
 
@@ -181,85 +181,6 @@ export function buildLearnBalance(days = 14, ref = todayKey()) {
   return { build, learn, total: build + learn };
 }
 
-/* ---------------- recurring reminders ----------------
-   Upkeep that repeats on its own clock: every N days, or every N weeks on a
-   chosen day. A reminder only appears once it is actually due, and stays until
-   it is done — missing Sunday doesn't erase it, it just carries. */
-
-/** The most recent date on or before `key` that this reminder was due. */
-export function lastDueOn(r, key) {
-  if (r.mode === 'weekly') {
-    const every = Math.max(1, r.every || 1);
-    const days = r.days?.length ? r.days : [0];
-    const anchor = r.anchor || r.createdKey || key;
-    for (let i = 0; i <= every * 7 + 7; i++) {
-      const d = addDays(key, -i);
-      if (!days.includes(dow(d))) continue;
-      const weeks = Math.floor(daysBetween(weekKeyOf(anchor), weekKeyOf(d)) / 7);
-      if (weeks >= 0 && weeks % every === 0) return d;
-    }
-    return null;
-  }
-  // interval: due every N days from the last time it was done
-  const every = Math.max(1, r.every || 1);
-  const base = r.lastDone || r.createdKey;
-  if (!base) return key;
-  if (!r.lastDone) return base <= key ? base : null;
-  const gap = daysBetween(base, key);
-  if (gap < every) return null;
-  return addDays(base, Math.floor(gap / every) * every);
-}
-
-export function reminderState(r, key = todayKey()) {
-  const due = lastDueOn(r, key);
-  const isDue = !!due && (!r.lastDone || r.lastDone < due);
-  return {
-    due: isDue,
-    dueOn: due,
-    overdue: isDue && due ? daysBetween(due, key) : 0,
-    lastDone: r.lastDone
-  };
-}
-
-/** Reminders that want attention on this day, most overdue first. */
-export function dueReminders(key = todayKey()) {
-  return (state.reminders || [])
-    .map((r) => ({ r, s: reminderState(r, key) }))
-    .filter((x) => x.s.due)
-    .sort((a, b) => b.s.overdue - a.s.overdue);
-}
-
-/** When this reminder next comes around, for display in settings. */
-export function nextDueText(r, key = todayKey()) {
-  const st = reminderState(r, key);
-  if (st.due) return st.overdue > 0 ? `Due — ${st.overdue}d late` : 'Due today';
-  if (r.mode === 'interval') {
-    const next = addDays(r.lastDone || key, Math.max(1, r.every || 1));
-    const inDays = daysBetween(key, next);
-    return inDays <= 0 ? 'Due today' : inDays === 1 ? 'Due tomorrow' : `Due in ${inDays} days`;
-  }
-  for (let i = 1; i <= (r.every || 1) * 7 + 7; i++) {
-    const d = addDays(key, i);
-    const last = lastDueOn(r, d);
-    if (last === d) return i === 1 ? 'Due tomorrow' : `Due in ${i} days`;
-  }
-  return '';
-}
-
-export function markReminderDone(r, key = todayKey()) {
-  r.lastDone = key;
-}
-
-/** Plain-English summary of the schedule, e.g. "Every 4 days". */
-export function reminderRule(r) {
-  const n = Math.max(1, r.every || 1);
-  if (r.mode === 'interval') return n === 1 ? 'Every day' : `Every ${n} days`;
-  const names = (r.days?.length ? r.days : [0]).map((d) => DOW_LONG_LOCAL[d]).join(', ');
-  return n === 1 ? `Every ${names}` : n === 2 ? `Every other ${names}` : `Every ${n} weeks on ${names}`;
-}
-
-const DOW_LONG_LOCAL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
 /* ---------------- the shape of a normal day ----------------
    Baseline suggestions drawn from how the week usually runs. Advisory only:
    nothing here is checked off, scored, or held against you. */
@@ -321,7 +242,7 @@ export function rightNow(key = todayKey(), now = new Date()) {
       return {
         icon: first.kind === 'gym' ? '💪' : first.kind === 'faith' ? '✝️' : '💼',
         title: first.label,
-        why: `This is usually how ${DOW_LONG_LOCAL[dow(key)]} starts. School at ${fmtTime(rhythm.school.start)}.`,
+        why: `This is usually how ${DOW_LONG[dow(key)]} starts. School at ${fmtTime(rhythm.school.start)}.`,
         intent: first.kind === 'gym' ? 'gym' : first.kind === 'faith' ? 'other' : 'money'
       };
     }
@@ -404,4 +325,58 @@ export function dayScore(key) {
   let got = st.requiredDone + (st.mustDone ? 1 : 0);
   if (total === 0) return null;
   return got / total;
+}
+
+/* ---------------- how the sky is coloured ----------------
+   One number, 0 (missing everything) to 1 (holding everything), over the last
+   seven *finished* days. Today is excluded on purpose: a morning with nothing
+   ticked yet is not a failing week, and colouring it red would say otherwise. */
+
+export function mood(ref = todayKey(), window = 7) {
+  const recorded = Object.keys(state.days).sort();
+  if (!recorded.length) return 0.5;
+  const first = recorded[0];
+  let got = 0, total = 0;
+
+  for (let i = 1; i <= window; i++) {
+    const k = addDays(ref, -i);
+    if (k < first) continue;
+    const rec = state.days[k];
+    const st = dayStatus(k);
+    total += st.required + (rec?.mustId ? 1 : 0);
+    got += st.requiredDone + (st.mustDone ? 1 : 0);
+  }
+  return total ? got / total : 0.5;
+}
+
+/** Per-area hit rate over the same window, weakest first. */
+export function areaRates(ref = todayKey(), window = 7) {
+  const rows = [
+    { id: 'must',     label: 'Daily focus',  hit: 0, of: 0 },
+    { id: 'business', label: 'Business',     hit: 0, of: 0 },
+    { id: 'faith',    label: 'Faith',        hit: 0, of: 0 },
+    { id: 'school',   label: 'School',       hit: 0, of: 0 },
+    { id: 'workout',  label: 'Training',     hit: 0, of: 0 },
+    { id: 'bed',      label: 'Lights out',   hit: 0, of: 0 },
+    { id: 'wake',     label: 'Wake time',    hit: 0, of: 0 }
+  ];
+  const by = Object.fromEntries(rows.map((r) => [r.id, r]));
+  const recorded = Object.keys(state.days).sort();
+  const first = recorded[0];
+
+  for (let i = 1; i <= window; i++) {
+    const k = addDays(ref, -i);
+    if (!first || k < first) continue;
+    const rec = state.days[k];
+    if (!rec) continue;
+    const st = dayStatus(k);
+    if (rec.mustId) { by.must.of++; if (st.mustDone) by.must.hit++; }
+    by.business.of++; if (rec.money) by.business.hit++;
+    if (faithFor(k)) { by.faith.of++; if (rec.faith) by.faith.hit++; }
+    if (state.settings.school.days.includes(dow(k))) { by.school.of++; if (rec.school) by.school.hit++; }
+    if (!state.settings.fitness.excluded.includes(dow(k))) { by.workout.of++; if (rec.workout) by.workout.hit++; }
+    by.bed.of++; if (rec.bed) by.bed.hit++;
+    by.wake.of++; if (rec.wake) by.wake.hit++;
+  }
+  return rows.filter((r) => r.of > 0).sort((a, b) => (a.hit / a.of) - (b.hit / b.of));
 }

@@ -3,59 +3,57 @@
 A personal command center for one person, installable on an iPhone home screen.
 No accounts, no server, no subscriptions. Everything lives on the device.
 
-```
-LONG-TERM GOALS  →  CURRENT PROJECT  →  THIS WEEK'S BIG WIN  →  TODAY'S MUST WIN  →  NEXT ACTION
-```
+The app is a globe of stars. Today's focus sits dead centre; everything else
+orbits behind it in order of importance. Drag to turn it, pinch to zoom, tap a
+star to open it, tap empty space for the read-out.
 
-## What it does
+## The globe
 
-| Screen | Purpose |
+| Star | What it holds |
 | --- | --- |
-| **Today** | One Must Win, up to two Secondary Wins, the day's usual shape, any reminders that are due, the standards that apply to *this* day, sleep targets, weekly workout and social counts, the current project, and Salvage mode. |
-| **Plan** | Tomorrow in three decisions (the third optional), plus Today / Upcoming / Inbox / Done task lists. |
-| **Business** | One current project — a name is enough. Shows the last 7 days of logged work (derived, nothing to fill in) and a learning list to park reading in so it doesn't eat build time. |
-| **Goals** | Long-term outcomes with category, priority, target date, and status. Direction, not a to-do list. |
-| **More** | History and trends, Sunday Reset, Settings, and backup/restore. |
-| **Capture** (＋) | Anywhere, any time. One field, defaults to the Inbox so nothing demands a decision mid-thought. |
-| **Focus** | "What are you supposed to be doing right now?" — one honest answer, an optional timer. |
+| **Focus** | The one thing today. Largest, centre, calm red. |
+| **Secondary** | Up to two. Good if they happen, never at the focus's expense. |
+| **Business** | The current project, a one-tap work log, the last seven days, a learning list. |
+| **Faith / School / Train / Sleep** | The day's commitments. Each lights up when held. |
+| **Tomorrow** | The nightly ritual: one focus, up to two secondary, anything unusual. |
+| **This week** | The week's one goal, training and social rhythm, the weekly reset. |
+| **Life** | Priorities in order, the goal under each, and the daily and weekly cadence that gets you there. |
+| **Settings** | Sleep times, faith schedule, training targets, school hours, data. |
 
-### The rules built into it
+The corner button holds only what doesn't belong on the globe: capture, the
+task list, and salvage.
 
-- **One Must Win a day.** Two secondary, at most. The cap is the feature.
-- **Minimum beats ideal.** 3 workouts is a successful week; 4 is a bonus, never the bar.
-- **Never miss twice.** A miss produces one calm nudge on the next occasion, not a broken streak.
-- **Salvage, don't scrap.** A bad day shrinks to three moves instead of ending the system.
-- **Build before learn.** Research is allowed; output is what the app keeps score of.
-- **Earned leisure, without guilt.** When the mission is handled, the app says so plainly.
-- **No points, levels, streaks, or shame scores.** Just what happened, so patterns are visible.
-- **Reminders appear only when due.** Recurring upkeep repeats on its own clock — every N days, or every N weeks on chosen days — and carries over if missed rather than silently resetting.
-- **The weekly rhythm suggests, never enforces.** Typical school hours and how each day usually runs inform Today's shape and the "what should I be doing right now?" answer. Nothing in it is tracked or scored.
+## The colour of the sky
 
-Standards adapt to the day: the faith row shows the commitment actually scheduled
-(personal study, church, or group study), school is quiet on weekends, movement is only
-"required" when it's the last chance to reach the weekly minimum, and Sunday's Money
-Engine work is the review inside Sunday Reset.
+The background is the region of space you're flying through, and it tracks the
+**seven days before today** — blue when you're holding everything, red when
+you're not, every shade between. It is deliberately quiet and mostly black.
 
-The day rolls over at **3:00 AM**, so a late-night check-in still belongs to the day
-you're finishing.
+Today is excluded on purpose. A morning with nothing ticked yet is not a failing
+week, and colouring it red would say otherwise. Tap the background for the
+numbers behind the colour and the one area worth pushing this week.
+
+## The rules it keeps
+
+- **One focus a day.** Two secondary, at most. The cap is the feature.
+- **Minimum beats ideal.** Three sessions is a successful training week; four is a bonus, never the bar.
+- **A bad day shrinks, it doesn't end the system.** Salvage reduces the day to three moves.
+- **No points, levels, streaks or scores.** The sky brightens as you act; that's the whole reward.
+- **Nothing appears twice.** Each fact has exactly one home.
+- **No commentary.** The app shows what is true and stays quiet.
 
 ## Install it on an iPhone
 
-1. Publish the files (see below) and open the URL in **Safari** on the phone.
-2. Tap **Share** → **Add to Home Screen**.
-3. Open it from the home screen. It runs full-screen, works offline, and keeps its data
-   on the device.
+1. Open the published URL in **Safari**.
+2. Share → **Add to Home Screen**.
+3. Open it from the icon. Full screen, works offline, data stays on the phone.
 
-### Publishing with GitHub Pages
+Updates land by themselves: open the app and it refreshes to the latest build.
 
-The app is plain static files with no build step, so the repository can be served as-is.
+### Publishing
 
-- **Simplest:** repo **Settings → Pages → Source: Deploy from a branch**, pick the branch
-  and `/ (root)`. The app appears at `https://<user>.github.io/<repo>/`.
-- **Or via Actions:** set **Source: GitHub Actions**; `.github/workflows/pages.yml`
-  publishes on every push to `main`.
-
-Any static host works — the app only needs the files served over HTTPS.
+Static files, no build step. **Settings → Pages → Deploy from a branch → main /
+(root)**, or let `.github/workflows/pages.yml` publish on push to `main`.
 
 ## Running it locally
 
@@ -63,43 +61,33 @@ Any static host works — the app only needs the files served over HTTPS.
 python3 -m http.server 8000    # then open http://localhost:8000
 ```
 
-A service worker only registers over HTTPS or on `localhost`.
-
 ## Your data
 
-Everything is one JSON object in `localStorage` under the key `personal-os`. It never
-leaves the device.
-
-- **More → Export a backup** copies the whole thing to the clipboard.
-- **More → Restore from a backup** pastes it back, on this device or another.
-
-Clearing Safari's website data for the site erases it, so export occasionally. Because all
-state flows through one store module (`js/store.js`), adding cloud sync later means
-changing one read/write seam rather than the whole app.
+One JSON object in `localStorage` under `personal-os`, never leaving the device.
+**Settings → Export a backup** copies it out; **Restore** pastes it back.
 
 ## How it's built
 
-Vanilla ES modules, no framework, no bundler, no dependencies — it loads in one round trip
-and stays easy to change.
+Vanilla ES modules, no framework, no bundler, no dependencies. The globe is
+Canvas 2D with its own projection — no 3D library.
 
 ```
-index.html              shell: nav, capture button, sheet + focus layers
-manifest.webmanifest    installable PWA metadata
-sw.js                   offline cache (network-first for the page, cache-first for assets)
+index.html              canvas, corner button, build sentinel
 css/app.css             the whole design system
+sw.js                   offline cache (network-first, cache as fallback)
 js/
-  app.js                router, bottom nav, service-worker registration
-  store.js              state, persistence, migrations, CRUD
-  logic.js              domain rules: standards, sleep, workouts, nudges, stats
+  app.js                bootstrap, the corner menu, service worker
+  sky.js                sphere projection, input, painting
+  stars.js              what sits on the globe, ordered by importance
+  panels.js             every panel behind every star
+  store.js              state, persistence, migrations
+  logic.js              the rules: standards, sleep, training, mood, areas
   util.js               dates (3 AM rollover, Sunday-led weeks), formatting
-  ui.js                 bottom sheets, toasts, confirmations, small builders
-  capture.js            the capture sheet
-  focus.js              the focus overlay
-  pick.js               choose-or-create task picker
-  tasks-ui.js           shared task row and editor
-  views/                today, plan, money, goals, more, stats, settings, sunday
-scripts/make_icons.py   regenerates the icon set (pure stdlib, no image libraries)
+  ui.js                 panels, toasts, confirms, line/dot builders
+scripts/make_icons.py   regenerates the icons (pure stdlib)
 ```
 
-Views expose `render()` and `mount(root)`; every mutation goes through `mutate()` in the
-store, which saves and re-renders. That is the entire architecture.
+Index 0 of the star list sits exactly on the pole facing the camera; the rest
+spiral to the back. `__POS_BUILD` in `index.html` and `__POS_READY` in
+`js/app.js` must be bumped together on every release — a mismatch makes the app
+clear its caches and reload rather than run stale modules.
