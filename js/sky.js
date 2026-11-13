@@ -428,14 +428,16 @@ export class Sky {
         ctx.moveTo(p.sx, p.sy + drop - 11);
         ctx.lineTo(p.sx, p.sy + drop + 1);
         ctx.stroke();
-        const long = s.label.length > 26;
-        ctx.font = `400 ${long ? 14.5 : 16}px -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif`;
+        ctx.font = `400 ${s.label.length > 26 ? 14.5 : 16}px -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif`;
         ctx.textAlign = 'center';
-        ctx.fillStyle = `rgba(234,240,250,${0.95 * a})`;
-        ctx.fillText(s.label, p.sx, p.sy + drop + 15);
-        ctx.font = '500 12.5px -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif';
+        // Keep the label on screen when the globe is turned and the focus star
+        // sits near an edge — it used to run off the side.
         const tw = ctx.measureText(s.label).width;
-        placed.push({ x: p.sx - tw / 2 - 8, y: p.sy + drop + 4, w: tw + 16, h: 24 });
+        const lx = clamp(p.sx, tw / 2 + 14, w - tw / 2 - 14);
+        ctx.fillStyle = `rgba(234,240,250,${0.95 * a})`;
+        ctx.fillText(s.label, lx, p.sy + drop + 15);
+        ctx.font = '500 12.5px -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif';
+        placed.push({ x: lx - tw / 2 - 8, y: p.sy + drop + 4, w: tw + 16, h: 24 });
         continue;
       }
       const right = p.sx <= w / 2;

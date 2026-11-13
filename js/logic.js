@@ -454,5 +454,45 @@ export function urgentStars(key = todayKey(), now = new Date()) {
   const t = sleepTargets(key);
   if (nowMin(now) >= toMin(t.windDown) - 150 && !getDay(addDays(key, 1)).mustId) urgent.add('plan');
 
+  for (const id of neglected(key)) urgent.add(id);
+
   return urgent;
+}
+
+/* ---------------- neglect ----------------
+   A star also spikes when you have simply stopped showing up for it. Capped at
+   the two worst, because if everything spikes, nothing does — and an area you
+   have already handled today never spikes, whatever last week looked like. */
+
+const NEGLECT_WINDOW = 10;
+const NEGLECT_RATE = 0.34;      // below this it counts as being ignored
+const NEGLECT_MIN_CHANCES = 4;  // never judge on one or two days
+const NEGLECT_MAX = 2;
+
+export function neglected(key = todayKey(), window = NEGLECT_WINDOW) {
+  const today = getDay(key);
+  const rows = [
+    { id: 'business',  field: 'money',   applies: () => true,                                     doneToday: !!today.money },
+    { id: 'faith',     field: 'faith',   applies: (k) => !!faithFor(k),                           doneToday: !!today.faith },
+    { id: 'education', field: 'school',  applies: (k) => state.settings.school.days.includes(dow(k)), doneToday: !!today.school },
+    { id: 'move',      field: 'workout', applies: (k) => !state.settings.fitness.excluded.includes(dow(k)), doneToday: !!today.workout },
+    { id: 'sleep',     field: 'bed',     applies: () => true,                                     doneToday: !!today.bed },
+    { id: 'must',      field: null,      applies: (k) => !!state.days[k]?.mustId,                 doneToday: !!taskById(today.mustId)?.done }
+  ];
+
+  const scored = [];
+  for (const row of rows) {
+    if (row.doneToday) continue;
+    let hit = 0, of = 0;
+    for (let i = 1; i <= window; i++) {
+      const k = addDays(key, -i);
+      const rec = state.days[k];
+      if (!rec || !row.applies(k)) continue;
+      of++;
+      if (row.field ? rec[row.field] : taskById(rec.mustId)?.done) hit++;
+    }
+    if (of >= NEGLECT_MIN_CHANCES && hit / of < NEGLECT_RATE) scored.push({ id: row.id, rate: hit / of });
+  }
+
+  return scored.sort((a, b) => a.rate - b.rate).slice(0, NEGLECT_MAX).map((x) => x.id);
 }

@@ -241,11 +241,14 @@ p { margin: 0; }
   padding: 0 10px calc(var(--safe-b) + 10px);
 }
 #tabs button {
-  flex: 0 1 auto; padding: 10px 11px; min-height: 40px;
-  font-size: 11.5px; font-weight: 450; letter-spacing: .04em;
+  flex: 1 1 0; min-width: 0; padding: 8px 2px 4px; min-height: 52px;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 450; letter-spacing: .03em;
   color: rgba(214, 224, 240, .42);
   transition: color .2s var(--ease);
 }
+#tabs button svg { width: 20px; height: 20px; opacity: .85; }
+#tabs button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 #tabs button:active { color: rgba(226, 234, 246, .95); }
 
 /* ---------- segmented + chips ---------- */

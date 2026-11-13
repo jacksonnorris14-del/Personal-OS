@@ -879,8 +879,8 @@ function rhythmPanel(i) {
 
 export function capturePanel() {
   openPanel({
-    title: 'Capture',
-    body: `<input class="input" id="cp" data-autofocus placeholder="Anything" enterkeyhint="done">
+    title: 'Quick Note',
+    body: `<input class="input" id="cp" data-autofocus placeholder="Anything worth remembering" enterkeyhint="done">
            <button class="btn accent wide" id="cg">Save To Inbox</button>`,
     onMount(panel, close) {
       const go = () => {
@@ -917,7 +917,7 @@ export function salvagePanel() {
   const proj = currentProject();
   const t = sleepTargets(key);
   openPanel({
-    kicker: 'Salvage', title: 'Shrink Today',
+    kicker: 'Rescue Today', title: 'Three Moves',
     body: `<p class="lede">Three moves and the day still counts.</p>
       <div class="lines">
         ${line('Handle The Most Urgent Thing', { on: !!d.salvageSteps.urgent, attrs: 'data-s="urgent"' })}

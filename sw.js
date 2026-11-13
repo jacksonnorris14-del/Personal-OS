@@ -1,5 +1,5 @@
 /* Personal OS service worker — offline-first, self-updating. */
-const VERSION = 'pos-v6';
+const VERSION = 'pos-v7';
 const ASSETS = [
   './',
   './index.html',
