@@ -1,9 +1,11 @@
 name: Nightly planning push
 
-# Sends one push asking you to set tomorrow. Requires three repo secrets:
-#   VAPID_PRIVATE_KEY  — from scripts/vapid.mjs, pairs with push-config.json
+# Sends one push asking you to set tomorrow. Requires four repo secrets, all of
+# which the app generates on the phone under Settings → Nightly Push:
+#   VAPID_PUBLIC_KEY   — the public half of the key pair
+#   VAPID_PRIVATE_KEY  — the private half, shown once, never stored
+#   PUSH_SUBSCRIPTION  — where to send it
 #   VAPID_SUBJECT      — mailto:you@example.com
-#   PUSH_SUBSCRIPTION  — the JSON the app shows under Settings → Nightly Reminder
 #
 # 03:15 UTC is 10:15 PM US Eastern in winter (11:15 PM in summer — GitHub cron
 # has no timezone, so shift this when the clocks change). Actions cron is
@@ -25,6 +27,7 @@ jobs:
       - run: npm install web-push@3.6.7 --no-save
       - name: Send
         env:
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}

@@ -1,5 +1,5 @@
 /* Personal OS service worker — offline-first, self-updating. */
-const VERSION = 'pos-v7';
+const VERSION = 'pos-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -13,7 +13,6 @@ const ASSETS = [
   './js/logic.js',
   './js/util.js',
   './js/ui.js',
-  './push-config.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',

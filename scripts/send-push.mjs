@@ -1,17 +1,16 @@
 /* Sends the nightly planning push. Run by .github/workflows/nightly-push.yml. */
 import webpush from 'web-push';
-import { readFileSync } from 'fs';
 
-const { VAPID_PRIVATE_KEY, VAPID_SUBJECT, PUSH_SUBSCRIPTION } = process.env;
-const missing = ['VAPID_PRIVATE_KEY', 'VAPID_SUBJECT', 'PUSH_SUBSCRIPTION']
+const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, PUSH_SUBSCRIPTION } = process.env;
+const missing = ['VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT', 'PUSH_SUBSCRIPTION']
   .filter((k) => !process.env[k]);
 if (missing.length) {
   console.error('Missing secrets: ' + missing.join(', '));
+  console.error('All four are made in the app under Settings -> Nightly Push.');
   process.exit(1);
 }
 
-const { vapidPublicKey } = JSON.parse(readFileSync(new URL('../push-config.json', import.meta.url)));
-webpush.setVapidDetails(VAPID_SUBJECT, vapidPublicKey, VAPID_PRIVATE_KEY);
+webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 // One subscription, or several, if the app is installed on more than one device.
 const raw = JSON.parse(PUSH_SUBSCRIPTION);

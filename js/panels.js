@@ -338,42 +338,103 @@ const urlB64ToU8 = (s64) => {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 };
 
+const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)))
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/** Make the VAPID pair here, on the device. The private half is shown once so
+    it can be pasted into a repo secret; it never travels anywhere else. */
+async function generateVapid() {
+  const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign']);
+  const raw = await crypto.subtle.exportKey('raw', kp.publicKey);
+  const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+  return { publicKey: b64url(raw), privateKey: jwk.d };
+}
+
+const PUB_KEY = 'pos-vapid-public';
+
 export function pushPanel() {
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   const perm = supported ? Notification.permission : 'unsupported';
+  const pub = localStorage.getItem(PUB_KEY);
 
   openPanel({
     kicker: 'Nightly Reminder', title: 'Set Tomorrow, Nightly',
     body: `
       ${!supported ? '<p class="lede">This browser cannot do push notifications.</p>'
-        : !standalone ? '<p class="lede">Add the app to your Home Screen first — iOS only allows notifications from an installed app. Then come back here.</p>'
+        : !standalone ? '<p class="lede">Add the app to your Home Screen first — iOS only allows notifications from an installed app, then come back here.</p>'
         : perm === 'denied' ? '<p class="lede">Notifications are blocked for this app. Turn them back on in iOS Settings → Notifications → Personal OS, then return here.</p>'
-        : '<p class="lede">Turn this on, then paste the code below into the repo secret so the nightly send knows where to reach you.</p>'}
-      ${supported && standalone && perm !== 'denied'
-        ? `<button class="btn accent wide" data-x="sub">${perm === 'granted' ? 'Refresh Subscription' : 'Turn On'}</button>` : ''}
-      <div id="sub-out"></div>`,
+        : ''}
+
+      ${supported && standalone ? `
+        <p class="kicker mt">Step 1 — Keys</p>
+        <p class="lede">${pub ? 'Keys already made on this device. Making new ones replaces them.' : 'Made here on your phone. The private half is shown once, for the repo secret.'}</p>
+        <button class="btn wide" data-x="keys">${pub ? 'Make New Keys' : 'Make Keys'}</button>
+        <div id="key-out"></div>
+
+        <p class="kicker mt">Step 2 — Turn It On</p>
+        ${perm === 'denied'
+          ? '<p class="lede">Notifications are blocked, so this step will fail until you allow them again above.</p>'
+          : `<button class="btn accent wide" data-x="sub" ${pub ? '' : 'disabled'}>${perm === 'granted' ? 'Refresh Subscription' : 'Turn On'}</button>`}
+        <div id="sub-out"></div>` : ''}`,
     onMount(panel) {
+      const copyBlock = (id, label, value, note) => `
+        <p class="kicker mt">${label}</p>
+        <textarea class="input tall" id="${id}" readonly>${esc(value)}</textarea>
+        <button class="btn wide" data-copy="${id}">Copy</button>
+        <p class="lede">${note}</p>`;
+
+      bind(panel, '[data-copy]', async (el) => {
+        const ta = panel.querySelector('#' + el.dataset.copy);
+        try { await navigator.clipboard.writeText(ta.value); toast('Copied'); }
+        catch { ta.select(); toast('Select And Copy'); }
+      });
+
+      bind(panel, '[data-x="keys"]', async () => {
+        const out = panel.querySelector('#key-out');
+        out.innerHTML = '<p class="lede">Generating…</p>';
+        try {
+          const { publicKey, privateKey } = await generateVapid();
+          localStorage.setItem(PUB_KEY, publicKey);
+          out.innerHTML =
+            copyBlock('k-pub', 'Public Key — Secret VAPID_PUBLIC_KEY', publicKey, 'Save as the repo secret VAPID_PUBLIC_KEY.') +
+            copyBlock('k-priv', 'Private Key — Secret VAPID_PRIVATE_KEY', privateKey,
+              'Save as the repo secret VAPID_PRIVATE_KEY. This is shown once and is not stored.');
+          const subBtn = panel.querySelector('[data-x="sub"]');
+          if (subBtn) subBtn.disabled = false;
+          bind(panel, '[data-copy]', async (el) => {
+            const ta = panel.querySelector('#' + el.dataset.copy);
+            try { await navigator.clipboard.writeText(ta.value); toast('Copied'); }
+            catch { ta.select(); toast('Select And Copy'); }
+          });
+        } catch (err) {
+          out.innerHTML = `<p class="lede">Could not generate: ${esc(err.message)}</p>`;
+        }
+      });
+
       bind(panel, '[data-x="sub"]', async () => {
         const out = panel.querySelector('#sub-out');
+        const key = localStorage.getItem(PUB_KEY);
+        if (!key) { out.innerHTML = '<p class="lede">Make the keys first.</p>'; return; }
         out.innerHTML = '<p class="lede">Asking…</p>';
         try {
           const p2 = await Notification.requestPermission();
           if (p2 !== 'granted') { out.innerHTML = '<p class="lede">Not granted.</p>'; return; }
           const reg = await navigator.serviceWorker.ready;
-          const cfg = await fetch('push-config.json').then((r) => r.json());
+          const existing = await reg.pushManager.getSubscription();
+          if (existing) await existing.unsubscribe();
           const sub = await reg.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: urlB64ToU8(cfg.vapidPublicKey)
+            applicationServerKey: urlB64ToU8(key)
           });
           const json = JSON.stringify(sub.toJSON());
-          out.innerHTML = `<p class="kicker mt">Your Subscription</p>
-            <textarea class="input tall" id="subj" readonly>${esc(json)}</textarea>
-            <button class="btn wide" id="subcopy">Copy</button>
-            <p class="lede">Save this as the repo secret <b>PUSH_SUBSCRIPTION</b>.</p>`;
-          panel.querySelector('#subcopy').onclick = async () => {
-            try { await navigator.clipboard.writeText(json); toast('Copied'); } catch { toast('Select And Copy'); }
-          };
+          out.innerHTML = copyBlock('subj', 'Subscription — Secret PUSH_SUBSCRIPTION', json,
+            'Save as the repo secret PUSH_SUBSCRIPTION. Redo this if you reinstall the app.');
+          bind(panel, '[data-copy]', async (el) => {
+            const ta = panel.querySelector('#' + el.dataset.copy);
+            try { await navigator.clipboard.writeText(ta.value); toast('Copied'); }
+            catch { ta.select(); toast('Select And Copy'); }
+          });
         } catch (err) {
           out.innerHTML = `<p class="lede">Could not subscribe: ${esc(err.message)}</p>`;
         }
