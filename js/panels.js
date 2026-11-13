@@ -2,16 +2,18 @@
 
 import {
   state, getDay, day, getWeek, week, mutate, commit, taskById, setTaskDone,
-  newTask, newGoal, deleteGoal, newProject, deleteProject, currentProject,
-  exportJSON, importJSON, resetAll, FAITH_KINDS
+  newTask, newGoal, deleteGoal, newProject, currentProject,
+  newReminder, reminderById, deleteReminder, newLearned, deleteLearned,
+  exportJSON, importJSON, resetAll, FAITH_KINDS, AREAS
 } from './store.js';
 import {
   faithFor, sleepTargets, workoutStats, socialStats, rhythmFor,
-  mood, areaRates, projectTasks
+  mood, areaRates, projectTasks, dueReminders, reminderState,
+  reminderRule, markReminderDone
 } from './logic.js';
 import {
   todayKey, tomorrowKey, addDays, dow, weekKeyOf, weekDays, esc, fmtTime,
-  haptic, sortBy, relDay, fmtShort, DOW_LONG, daysBetween
+  haptic, sortBy, relDay, fmtShort, DOW_SHORT, DOW_LONG, daysBetween
 } from './util.js';
 import { openPanel, closePanel, confirmPanel, toast, bind, line, dots, field } from './ui.js';
 
@@ -30,8 +32,8 @@ function pickTask({ title, dateKey, exclude = [], onPick }) {
     title,
     body: `
       <input class="input" id="pk" data-autofocus placeholder="Write it" enterkeyhint="done" autocomplete="off">
-      <button class="btn accent wide" id="pk-go">Use this</button>
-      ${open.length ? `<p class="kicker mt">Or pick one</p>
+      <button class="btn accent wide" id="pk-go">Use This</button>
+      ${open.length ? `<p class="kicker mt">Or Pick One</p>
         <div class="lines">${open.map((t) => `
           <button class="line" data-pick="${t.id}">
             <span class="line-text"><span class="line-label">${esc(t.title)}</span>
@@ -58,21 +60,30 @@ function mustPanel() {
   const key = K();
   const d = getDay(key);
   const t = taskById(d.mustId);
+  const loose = dueReminders(key, null);
   openPanel({
     kicker: 'Today',
-    title: t ? t.title : 'No focus set',
-    body: t
-      ? `<button class="btn ${t.done ? '' : 'accent'} wide" data-x="done">${t.done ? 'Completed — undo' : 'Mark done'}</button>
+    title: t ? t.title : 'No Focus Set',
+    body: (t
+      ? `<button class="btn ${t.done ? '' : 'accent'} wide" data-x="done">${t.done ? 'Completed — Undo' : 'Mark Done'}</button>
          <button class="btn wide ghost" data-x="change">Change</button>`
       : `<p class="lede">One thing that would make today count.</p>
-         <button class="btn accent wide" data-x="change">Choose it</button>`,
+         <button class="btn accent wide" data-x="change">Choose It</button>`)
+      + (loose.length ? `<p class="kicker mt">Due</p><div class="lines">${loose.map(({ r: rm, s: rs }) =>
+          line(rm.label, { on: false, meta: rs.overdue > 0 ? `${rs.overdue} Days Overdue` : 'Due Today',
+                           attrs: `data-rdone="${rm.id}"` })).join('')}</div>` : ''),
     onMount(panel, close) {
+      bind(panel, '[data-rdone]', (el) => {
+        haptic(); const rm = reminderById(el.dataset.rdone);
+        if (rm) mutate(() => markReminderDone(rm, key));
+        close();
+      });
       bind(panel, '[data-x="done"]', () => {
         haptic(14); mutate(() => setTaskDone(t.id, !t.done)); close();
       });
       bind(panel, '[data-x="change"]', () => {
         close();
-        pickTask({ title: "Today's focus", dateKey: key,
+        pickTask({ title: "Today's Focus", dateKey: key,
           onPick: (id) => mutate(() => { const x = taskById(id); if (x) { x.date = key; x.inbox = false; } day(key).mustId = id; }) });
       });
     }
@@ -86,8 +97,8 @@ function secondPanel(star) {
   openPanel({
     kicker: 'Secondary',
     title: t.title,
-    body: `<button class="btn ${t.done ? '' : 'accent'} wide" data-x="done">${t.done ? 'Completed — undo' : 'Mark done'}</button>
-           <button class="btn wide ghost" data-x="drop">Remove from today</button>`,
+    body: `<button class="btn ${t.done ? '' : 'accent'} wide" data-x="done">${t.done ? 'Completed — Undo' : 'Mark Done'}</button>
+           <button class="btn wide ghost" data-x="drop">Remove From Today</button>`,
     onMount(panel, close) {
       bind(panel, '[data-x="done"]', () => { haptic(14); mutate(() => setTaskDone(t.id, !t.done)); close(); });
       bind(panel, '[data-x="drop"]', () => {
@@ -106,7 +117,7 @@ function togglePanel({ kicker, title, lede = '', fieldName, extra = '', onMount 
   openPanel({
     kicker, title,
     body: `${lede ? `<p class="lede">${esc(lede)}</p>` : ''}
-      <button class="btn ${d[fieldName] ? '' : 'accent'} wide" data-x="t">${d[fieldName] ? 'Done — undo' : 'Mark done'}</button>
+      <button class="btn ${d[fieldName] ? '' : 'accent'} wide" data-x="t">${d[fieldName] ? 'Done — Undo' : 'Mark Done'}</button>
       ${extra}`,
     onMount(panel, close) {
       bind(panel, '[data-x="t"]', () => {
@@ -123,10 +134,10 @@ function businessPanel() {
   const proj = currentProject();
   if (!proj) {
     openPanel({
-      kicker: 'Business', title: 'No current project',
+      kicker: 'Business', title: 'No Current Project',
       body: `<p class="lede">Name the thing you're building.</p>
              <input class="input" id="np" data-autofocus placeholder="Project name" enterkeyhint="done">
-             <button class="btn accent wide" id="np-go">Set it</button>`,
+             <button class="btn accent wide" id="np-go">Set It</button>`,
       onMount(panel, close) {
         const go = () => {
           const v = panel.querySelector('#np').value.trim();
@@ -147,15 +158,15 @@ function businessPanel() {
   openPanel({
     kicker: 'Business', title: proj.name,
     body: `
-      <button class="btn ${d.money ? '' : 'accent'} wide" data-x="log">${d.money ? 'Worked today — undo' : 'Log work today'}</button>
+      <button class="btn ${d.money ? '' : 'accent'} wide" data-x="log">${d.money ? 'Worked Today — Undo' : 'Log Work Today'}</button>
       <div class="rowline">${dots(week7)}<span class="line-meta">${week7.filter(Boolean).length} of 7 days</span></div>
-      <p class="kicker mt">Learning list</p>
+      <p class="kicker mt">Learning List</p>
       <div class="lines">
         ${learns.map((t) => line(t.title, { on: false, attrs: `data-learn="${t.id}"` })).join('')
           || '<p class="empty">Empty</p>'}
       </div>
-      <button class="btn wide ghost" data-x="add-learn">Add something to learn</button>
-      <button class="btn wide ghost" data-x="switch">Change project</button>`,
+      <button class="btn wide ghost" data-x="add-learn">Add Something To Learn</button>
+      <button class="btn wide ghost" data-x="switch">Change Project</button>`,
     onMount(panel, close) {
       bind(panel, '[data-x="log"]', () => { haptic(14); mutate(() => { day(key).money = !day(key).money; }); close(); });
       bind(panel, '[data-learn]', (el) => {
@@ -164,8 +175,8 @@ function businessPanel() {
       bind(panel, '[data-x="add-learn"]', () => {
         close();
         openPanel({
-          title: 'Add to learning list',
-          body: `<input class="input" id="ln" data-autofocus placeholder="What to learn" enterkeyhint="done">
+          title: 'Add To Learning List',
+          body: `<input class="input" id="ln" data-autofocus placeholder="What To Learn" enterkeyhint="done">
                  <button class="btn accent wide" id="ln-go">Add</button>`,
           onMount(p2, c2) {
             const go = () => {
@@ -192,8 +203,8 @@ function projectsPanel() {
           meta: p.id === state.settings.currentProjectId ? 'Current' : p.status,
           attrs: `data-p="${p.id}"` })).join('') || '<p class="empty">None yet</p>'}
       </div>
-      <input class="input mt" id="pn" placeholder="New project" enterkeyhint="done">
-      <button class="btn wide ghost" id="pn-go">Add project</button>`,
+      <input class="input mt" id="pn" placeholder="New Project" enterkeyhint="done">
+      <button class="btn wide ghost" id="pn-go">Add Project</button>`,
     onMount(panel, close) {
       bind(panel, '[data-p]', (el) => {
         mutate(() => { state.settings.currentProjectId = el.dataset.p; const p = state.projects.find((x) => x.id === el.dataset.p); if (p) p.status = 'active'; });
@@ -229,12 +240,12 @@ function sleepPanel() {
     kicker: 'Sleep', title: `${fmtTime(t.bedtime)} → ${fmtTime(t.wake)}`,
     body: `
       <div class="grid4">
-        ${[['Wind-down', t.windDown], ['Phone away', t.phoneAway], ['Lights out', t.bedtime], ['Wake', t.wake]]
+        ${[['Wind-Down', t.windDown], ['Phone Away', t.phoneAway], ['Lights Out', t.bedtime], ['Wake', t.wake]]
           .map(([l, v]) => `<div><span class="flabel">${l}</span><span class="stat-v">${fmtTime(v)}</span></div>`).join('')}
       </div>
       <div class="lines mt">
-        ${line('Woke at target', { on: !!d.wake, attrs: 'data-s="wake"' })}
-        ${line('Lights out on time', { on: !!d.bed, attrs: 'data-s="bed"' })}
+        ${line('Woke At Target', { on: !!d.wake, attrs: 'data-s="wake"' })}
+        ${line('Lights Out On Time', { on: !!d.bed, attrs: 'data-s="bed"' })}
       </div>`,
     onMount(panel) {
       bind(panel, '[data-s]', (el) => {
@@ -242,6 +253,233 @@ function sleepPanel() {
         mutate(() => { const r = day(key); r[el.dataset.s] = !r[el.dataset.s]; });
         closePanel();
       });
+    }
+  });
+}
+
+function educationPanel() {
+  const key = K();
+  const d = getDay(key);
+  const r = rhythmFor(key);
+  const isSchoolDay = state.settings.school.days.includes(dow(key));
+  const due = dueReminders(key, 'education');
+  const recent = state.learned.slice(0, 8);
+
+  openPanel({
+    kicker: 'Education',
+    title: isSchoolDay && r?.school ? `School ${fmtTime(r.school.start)}–${fmtTime(r.school.end)}` : 'Education',
+    wide: true,
+    body: `
+      ${isSchoolDay
+        ? `<button class="btn ${d.school ? '' : 'accent'} wide" data-x="school">${d.school ? 'Handled Today — Undo' : 'Mark School Handled'}</button>`
+        : '<p class="lede">No school today.</p>'}
+
+      ${due.length ? `<p class="kicker mt">Due</p>
+        <div class="lines">${due.map(({ r: rm, s: rs }) => line(rm.label, {
+          on: false, meta: rs.overdue > 0 ? `${rs.overdue} Days Overdue` : 'Due Today',
+          attrs: `data-rdone="${rm.id}"` })).join('')}</div>` : ''}
+
+      <p class="kicker mt">Learned Outside School</p>
+      <div class="lines">
+        ${recent.map((l) => line(l.title, { meta: fmtShort(l.at), attrs: `data-ldel="${l.id}"` })).join('')
+          || '<p class="empty">Nothing logged yet</p>'}
+      </div>
+      <button class="btn wide ghost" data-x="learn">Log Something Learned</button>
+      <button class="btn wide ghost" data-x="remind">Add A Reminder</button>`,
+    onMount(panel, close) {
+      bind(panel, '[data-x="school"]', () => {
+        haptic(14); mutate(() => { day(key).school = !day(key).school; }); close();
+      });
+      bind(panel, '[data-rdone]', (el) => {
+        haptic(); const rm = reminderById(el.dataset.rdone);
+        if (rm) mutate(() => markReminderDone(rm, key));
+        close();
+      });
+      bind(panel, '[data-ldel]', async (el) => {
+        const l = state.learned.find((x) => x.id === el.dataset.ldel);
+        close();
+        if (await confirmPanel({ title: 'Remove This?', note: l?.title || '', confirm: 'Remove', danger: true })) {
+          mutate(() => deleteLearned(el.dataset.ldel));
+        }
+        educationPanel();
+      });
+      bind(panel, '[data-x="learn"]', () => {
+        close();
+        openPanel({
+          kicker: 'Education', title: 'What Did You Learn?',
+          body: `<input class="input" id="lt" data-autofocus placeholder="In a few words" enterkeyhint="done">
+                 ${field('When', `<input type="date" class="input" id="ld" value="${todayKey()}">`)}
+                 <button class="btn accent wide" id="lg">Log It</button>`,
+          onMount(p2, c2) {
+            const go = () => {
+              const v = p2.querySelector('#lt').value.trim();
+              if (!v) return c2();
+              mutate(() => newLearned({ title: v, at: p2.querySelector('#ld').value || todayKey() }));
+              haptic(12); c2(); educationPanel();
+            };
+            p2.querySelector('#lg').onclick = go;
+            p2.querySelector('#lt').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+          }
+        });
+      });
+      bind(panel, '[data-x="remind"]', () => { close(); reminderEditor(null, 'education'); });
+    }
+  });
+}
+
+/* ---------- nightly push ----------
+   The browser can only subscribe; something server-side has to do the sending
+   at 10:15pm. A scheduled GitHub Action does that, and it needs the
+   subscription below stored as a repo secret. */
+
+const urlB64ToU8 = (s64) => {
+  const pad = '='.repeat((4 - (s64.length % 4)) % 4);
+  const raw = atob((s64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+};
+
+export function pushPanel() {
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const perm = supported ? Notification.permission : 'unsupported';
+
+  openPanel({
+    kicker: 'Nightly Reminder', title: 'Set Tomorrow, Nightly',
+    body: `
+      ${!supported ? '<p class="lede">This browser cannot do push notifications.</p>'
+        : !standalone ? '<p class="lede">Add the app to your Home Screen first — iOS only allows notifications from an installed app. Then come back here.</p>'
+        : perm === 'denied' ? '<p class="lede">Notifications are blocked for this app. Turn them back on in iOS Settings → Notifications → Personal OS, then return here.</p>'
+        : '<p class="lede">Turn this on, then paste the code below into the repo secret so the nightly send knows where to reach you.</p>'}
+      ${supported && standalone && perm !== 'denied'
+        ? `<button class="btn accent wide" data-x="sub">${perm === 'granted' ? 'Refresh Subscription' : 'Turn On'}</button>` : ''}
+      <div id="sub-out"></div>`,
+    onMount(panel) {
+      bind(panel, '[data-x="sub"]', async () => {
+        const out = panel.querySelector('#sub-out');
+        out.innerHTML = '<p class="lede">Asking…</p>';
+        try {
+          const p2 = await Notification.requestPermission();
+          if (p2 !== 'granted') { out.innerHTML = '<p class="lede">Not granted.</p>'; return; }
+          const reg = await navigator.serviceWorker.ready;
+          const cfg = await fetch('push-config.json').then((r) => r.json());
+          const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlB64ToU8(cfg.vapidPublicKey)
+          });
+          const json = JSON.stringify(sub.toJSON());
+          out.innerHTML = `<p class="kicker mt">Your Subscription</p>
+            <textarea class="input tall" id="subj" readonly>${esc(json)}</textarea>
+            <button class="btn wide" id="subcopy">Copy</button>
+            <p class="lede">Save this as the repo secret <b>PUSH_SUBSCRIPTION</b>.</p>`;
+          panel.querySelector('#subcopy').onclick = async () => {
+            try { await navigator.clipboard.writeText(json); toast('Copied'); } catch { toast('Select And Copy'); }
+          };
+        } catch (err) {
+          out.innerHTML = `<p class="lede">Could not subscribe: ${esc(err.message)}</p>`;
+        }
+      });
+    }
+  });
+}
+
+/* ---------- reminders ---------- */
+
+export function reminderEditor(id, presetArea = null) {
+  const r = id ? reminderById(id) : null;
+  const mode = r?.mode || 'once';
+  const area = r?.area ?? presetArea;
+
+  openPanel({
+    kicker: 'Reminder', title: r ? 'Edit Reminder' : 'New Reminder',
+    body: `
+      <input class="input" id="rl" data-autofocus value="${esc(r?.label || '')}" placeholder="What is it">
+
+      <p class="kicker mt">When</p>
+      <div class="seg">
+        <button class="${mode === 'once' ? 'on' : ''}" data-m="once">Once</button>
+        <button class="${mode === 'interval' ? 'on' : ''}" data-m="interval">Every N Days</button>
+        <button class="${mode === 'weekly' ? 'on' : ''}" data-m="weekly">Certain Days</button>
+      </div>
+
+      <div id="m-once" ${mode === 'once' ? '' : 'hidden'}>
+        ${field('Date', `<input type="date" class="input" id="rd" value="${r?.due || todayKey()}">`)}
+      </div>
+      <div id="m-interval" ${mode === 'interval' ? '' : 'hidden'}>
+        ${field('Every', `<input type="number" class="input" id="rn" min="1" max="365" value="${r?.mode === 'interval' ? r.every : 4}"> `)}
+        <p class="lede">Days, counted from the last time you did it.</p>
+      </div>
+      <div id="m-weekly" ${mode === 'weekly' ? '' : 'hidden'}>
+        <p class="kicker mt">On</p>
+        <div class="chips">${DOW_SHORT.map((dn, i) =>
+          `<button class="chip ${(r?.days || []).includes(i) ? 'on' : ''}" data-rd2="${i}">${dn}</button>`).join('')}</div>
+        ${field('Every N Weeks', `<input type="number" class="input" id="rw" min="1" max="12" value="${r?.mode === 'weekly' ? r.every : 1}">`)}
+      </div>
+
+      <p class="kicker mt">Which Star</p>
+      <div class="chips">
+        <button class="chip ${!area ? 'on' : ''}" data-ar="">None</button>
+        ${AREAS.map((a) => `<button class="chip ${area === a ? 'on' : ''}" data-ar="${a}">${a[0].toUpperCase() + a.slice(1)}</button>`).join('')}
+      </div>
+
+      <div class="row-actions">
+        ${r ? '<button class="btn danger" data-x="del">Delete</button>' : ''}
+        <button class="btn accent" data-x="save">Save</button>
+      </div>`,
+    onMount(panel, close) {
+      let m = mode, ar = area, days = [...(r?.days || [])];
+      const sync = () => {
+        ['once', 'interval', 'weekly'].forEach((x) => { panel.querySelector('#m-' + x).hidden = x !== m; });
+        panel.querySelectorAll('[data-m]').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+      };
+      bind(panel, '[data-m]', (el) => { m = el.dataset.m; haptic(); sync(); });
+      bind(panel, '[data-rd2]', (el) => {
+        const i = +el.dataset.rd2;
+        days = days.includes(i) ? days.filter((x) => x !== i) : [...days, i].sort();
+        el.classList.toggle('on');
+      });
+      bind(panel, '[data-ar]', (el) => {
+        ar = el.dataset.ar || null;
+        panel.querySelectorAll('[data-ar]').forEach((x) => x.classList.toggle('on', x === el));
+      });
+      panel.querySelector('[data-x="save"]').onclick = () => {
+        const label = panel.querySelector('#rl').value.trim();
+        if (!label) { toast('Name It First'); return; }
+        const patch = { label, area: ar, mode: m,
+          due: m === 'once' ? panel.querySelector('#rd').value : null,
+          every: m === 'interval' ? Math.max(1, +panel.querySelector('#rn').value || 1)
+               : m === 'weekly' ? Math.max(1, +panel.querySelector('#rw').value || 1) : 1,
+          days: m === 'weekly' ? days : [] };
+        mutate(() => { r ? Object.assign(r, patch) : newReminder(patch); });
+        close();
+      };
+      const del = panel.querySelector('[data-x="del"]');
+      if (del) del.onclick = async () => {
+        close();
+        if (await confirmPanel({ title: 'Delete Reminder?', note: r.label, confirm: 'Delete', danger: true })) {
+          mutate(() => deleteReminder(r.id));
+        }
+      };
+    }
+  });
+}
+
+export function remindersPanel() {
+  const key = K();
+  openPanel({
+    kicker: 'Reminders', title: `${state.reminders.length} Set`,
+    body: `<div class="lines">
+        ${state.reminders.map((r) => {
+          const st = reminderState(r, key);
+          return line(r.label, {
+            on: !st.due,
+            meta: `${reminderRule(r)}${st.due ? (st.overdue > 0 ? ` · ${st.overdue} Days Overdue` : ' · Due Today') : ''}`,
+            attrs: `data-redit="${r.id}"` });
+        }).join('') || '<p class="empty">None yet</p>'}
+      </div>
+      <button class="btn accent wide" data-x="new">New Reminder</button>`,
+    onMount(panel, close) {
+      bind(panel, '[data-redit]', (el) => { close(); reminderEditor(el.dataset.redit); });
+      bind(panel, '[data-x="new"]', () => { close(); reminderEditor(null); });
     }
   });
 }
@@ -266,21 +504,21 @@ function planPanel() {
       <p class="kicker mt">Focus</p>
       <div class="lines">
         ${must ? line(must.title, { attrs: 'data-x="must"' })
-               : line('Choose the one thing', { attrs: 'data-x="must"' })}
+               : line('Choose The One Thing', { attrs: 'data-x="must"' })}
       </div>
-      <p class="kicker mt">Secondary · up to two</p>
+      <p class="kicker mt">Secondary · Up To Two</p>
       <div class="lines">
-        ${seconds.map((t) => line(t.title, { attrs: `data-drop="${t.id}"`, meta: 'Tap to remove' })).join('')}
+        ${seconds.map((t) => line(t.title, { attrs: `data-drop="${t.id}"`, meta: 'Tap To Remove' })).join('')}
         ${seconds.length < 2 ? line('Add', { attrs: 'data-x="second"' }) : ''}
       </div>
-      <p class="kicker mt">Anything unusual</p>
+      <p class="kicker mt">Anything Unusual</p>
       <input class="input" id="note" value="${esc(d.note || '')}" placeholder="Optional">
-      <button class="btn accent wide" data-x="lock">${d.plannedAt ? 'Update' : 'Set tomorrow'}</button>`,
+      <button class="btn accent wide" data-x="lock">${d.plannedAt ? 'Update' : 'Set Tomorrow'}</button>`,
     onMount(panel, close) {
       const note = panel.querySelector('#note');
       bind(panel, '[data-x="must"]', () => {
         close();
-        pickTask({ title: "Tomorrow's focus", dateKey: key,
+        pickTask({ title: "Tomorrow's Focus", dateKey: key,
           onPick: (id) => { mutate(() => { const x = taskById(id); if (x) { x.date = key; x.inbox = false; } day(key).mustId = id; }); planPanel(); } });
       });
       bind(panel, '[data-x="second"]', () => {
@@ -301,10 +539,10 @@ function planPanel() {
       });
       bind(panel, '[data-x="lock"]', () => {
         const rec = day(key);
-        if (!rec.mustId) { toast('Pick a focus first'); return; }
+        if (!rec.mustId) { toast('Pick A Focus First'); return; }
         haptic(16);
         mutate(() => { const w = day(key); w.note = note.value.trim(); w.plannedAt = Date.now(); });
-        toast('Tomorrow is set');
+        toast('Tomorrow Is Set');
         close();
       });
     }
@@ -323,19 +561,19 @@ function weekPanel() {
   const wo = workoutStats(wk, key);
 
   openPanel({
-    kicker: `Week of ${fmtShort(wk)}`, title: w.bigWin || 'No week goal',
+    kicker: `Week of ${fmtShort(wk)}`, title: w.bigWin || 'No Week Goal',
     body: `
-      <input class="input" id="bw" value="${esc(w.bigWin || '')}" placeholder="The one thing this week">
-      ${w.bigWin ? `<div class="lines">${line(w.bigWinDone ? 'Achieved' : 'Mark achieved', { on: !!w.bigWinDone, attrs: 'data-x="bwdone"' })}</div>` : ''}
+      <input class="input" id="bw" value="${esc(w.bigWin || '')}" placeholder="The One Thing This Week">
+      ${w.bigWin ? `<div class="lines">${line(w.bigWinDone ? 'Achieved' : 'Mark Achieved', { on: !!w.bigWinDone, attrs: 'data-x="bwdone"' })}</div>` : ''}
 
       <p class="kicker mt">Rhythm</p>
       <div class="lines">
         ${line('Training', { value: `${wo.done}/${wo.min}` })}
-        ${line('With friends', { value: `${soc.done}/${soc.min}` })}
+        ${line('With Friends', { value: `${soc.done}/${soc.min}` })}
       </div>
-      <button class="btn wide ghost" data-x="soc">Log time with friends</button>
+      <button class="btn wide ghost" data-x="soc">Log Time With Friends</button>
 
-      <p class="kicker mt">Weekly reset · ${doneCount}/${items.length}</p>
+      <p class="kicker mt">Weekly Reset · ${doneCount}/${items.length}</p>
       <div class="lines">
         ${items.map((i) => line(i.label, { on: !!w.reset[i.id], attrs: `data-r="${i.id}"` })).join('')}
       </div>`,
@@ -390,18 +628,18 @@ function lifePanel() {
         <div class="area-head"><span class="rank">${i + 1}</span><h3>${esc(AREA[p]?.label || p)}</h3></div>
         ${goals.length
           ? goals.map((g) => `<p class="goal">${esc(g.name)}${g.target ? `<span class="line-meta"> · ${esc(horizon(g.target))}</span>` : ''}</p>`).join('')
-          : '<p class="goal dim">No goal set</p>'}
+          : '<p class="goal dim">No Goal Set</p>'}
         <dl class="cadence">
           ${r.daily ? `<div><dt>Daily</dt><dd>${esc(r.daily)}</dd></div>` : ''}
           ${r.weekly ? `<div><dt>Weekly</dt><dd>${esc(r.weekly)}</dd></div>` : ''}
         </dl>
-        <button class="btn tiny ghost" data-goal="${p}">Add goal</button>
+        <button class="btn tiny ghost" data-goal="${p}">Add Goal</button>
       </section>`;
   }).join('');
 
   openPanel({
-    kicker: 'Life', title: 'What this is all for', wide: true,
-    body: body + `<button class="btn wide ghost mt" data-x="order">Reorder priorities</button>`,
+    kicker: 'Life', title: 'What This Is All For', wide: true,
+    body: body + `<button class="btn wide ghost mt" data-x="order">Reorder Priorities</button>`,
     onMount(panel, close) {
       bind(panel, '[data-goal]', (el) => { close(); goalEditor(null, el.dataset.goal); });
       bind(panel, '[data-x="order"]', () => { close(); orderPanel(); });
@@ -420,10 +658,10 @@ function horizon(target) {
 function goalEditor(id, cat = 'money') {
   const g = id ? state.goals.find((x) => x.id === id) : null;
   openPanel({
-    title: g ? 'Edit goal' : 'New goal',
+    title: g ? 'Edit Goal' : 'New Goal',
     body: `
       ${field('Goal', `<input class="input" id="gn" data-autofocus value="${esc(g?.name || '')}" placeholder="What outcome">`)}
-      ${field('Target date · optional', `<input type="date" class="input" id="gd" value="${g?.target || ''}">`)}
+      ${field('Target Date · Optional', `<input type="date" class="input" id="gd" value="${g?.target || ''}">`)}
       <div class="row-actions">
         ${g ? '<button class="btn danger" data-x="del">Delete</button>' : ''}
         <button class="btn accent" data-x="save">Save</button>
@@ -439,7 +677,7 @@ function goalEditor(id, cat = 'money') {
       const del = panel.querySelector('[data-x="del"]');
       if (del) del.onclick = async () => {
         close();
-        if (await confirmPanel({ title: 'Delete goal?', note: g.name, confirm: 'Delete', danger: true })) {
+        if (await confirmPanel({ title: 'Delete Goal?', note: g.name, confirm: 'Delete', danger: true })) {
           mutate(() => deleteGoal(g.id)); lifePanel();
         }
       };
@@ -451,7 +689,7 @@ function orderPanel() {
   const render = () => {
     const s = state.settings;
     openPanel({
-      kicker: 'Priorities', title: 'What wins when time is short',
+      kicker: 'Priorities', title: 'What Wins When Time Is Short',
       body: `<div class="lines">${s.priorities.map((p, i) => `
         <div class="line static">
           <span class="rank">${i + 1}</span>
@@ -487,14 +725,14 @@ export function statsPanel() {
   const weakest = rates[0];
 
   openPanel({
-    kicker: 'Last seven days', title: `${Math.round(m * 100)}% held`,
+    kicker: 'Last seven days', title: `${Math.round(m * 100)}% Held`,
     body: `
       <p class="lede">The sky reads ${band.toLowerCase()}. It tracks the seven days before today, so this morning never counts against you.</p>
       <div class="lines mt">
         ${rates.map((r) => line(r.label, { value: pctTxt(r.hit, r.of) })).join('')}
       </div>
       ${weakest && weakest.of >= 3 && weakest.hit / weakest.of < 0.75
-        ? `<p class="kicker mt">This week</p><p class="lede">${esc(weakest.label)} is the weakest at ${pctTxt(weakest.hit, weakest.of)}. Hold it once more than last week.</p>`
+        ? `<p class="kicker mt">This Week</p><p class="lede">${esc(weakest.label)} is the weakest at ${pctTxt(weakest.hit, weakest.of)}. Hold it once more than last week.</p>`
         : ''}`
   });
 }
@@ -527,12 +765,12 @@ function settingsPanel() {
 
       <p class="kicker mt">Training</p>
       <div class="lines">
-        ${line('Minimum per week', { value: String(s.fitness.min), attrs: 'data-step="fmin"' })}
-        ${line('Ideal per week', { value: String(s.fitness.ideal), attrs: 'data-step="fideal"' })}
-        ${line('With friends · minimum', { value: String(s.social.min), attrs: 'data-step="smin"' })}
+        ${line('Minimum Per Week', { value: String(s.fitness.min), attrs: 'data-step="fmin"' })}
+        ${line('Ideal Per Week', { value: String(s.fitness.ideal), attrs: 'data-step="fideal"' })}
+        ${line('With Friends · Minimum', { value: String(s.social.min), attrs: 'data-step="smin"' })}
       </div>
 
-      <p class="kicker mt">School hours</p>
+      <p class="kicker mt">School Hours</p>
       <div class="lines">
         ${s.rhythm.map((r, i) => `
           <button class="line" data-rh="${i}">
@@ -541,11 +779,19 @@ function settingsPanel() {
           </button>`).join('')}
       </div>
 
+      <p class="kicker mt">Nightly Reminder</p>
+      <div class="lines">${line('Nightly Push', {
+        value: Notification?.permission === 'granted' ? 'On' : 'Off',
+        meta: 'A Nudge To Set Tomorrow', attrs: 'data-x="push"' })}</div>
+
+      <p class="kicker mt">Reminders</p>
+      <div class="lines">${line('Manage Reminders', { value: String(state.reminders.length), attrs: 'data-x="rem"' })}</div>
+
       <p class="kicker mt">Data</p>
       <div class="lines">
-        ${line('Export a backup', { attrs: 'data-x="exp"' })}
-        ${line('Restore from backup', { attrs: 'data-x="imp"' })}
-        ${line('Erase everything', { attrs: 'data-x="reset"' })}
+        ${line('Export A Backup', { attrs: 'data-x="exp"' })}
+        ${line('Restore From Backup', { attrs: 'data-x="imp"' })}
+        ${line('Erase Everything', { attrs: 'data-x="reset"' })}
       </div>`,
     onMount(panel, close) {
       const nm = panel.querySelector('#nm');
@@ -565,6 +811,8 @@ function settingsPanel() {
       });
 
       bind(panel, '[data-rh]', (el) => { close(); rhythmPanel(+el.dataset.rh); });
+      bind(panel, '[data-x="rem"]', () => { close(); remindersPanel(); });
+      bind(panel, '[data-x="push"]', () => { close(); pushPanel(); });
 
       bind(panel, '[data-x="exp"]', () => {
         close();
@@ -580,7 +828,7 @@ function settingsPanel() {
       });
       bind(panel, '[data-x="imp"]', () => {
         close();
-        openPanel({ title: 'Restore', body: `<textarea class="input tall" id="im" data-autofocus placeholder="Paste backup"></textarea>
+        openPanel({ title: 'Restore', body: `<textarea class="input tall" id="im" data-autofocus placeholder="Paste Backup"></textarea>
           <button class="btn accent wide" id="go">Restore</button>`,
           onMount(p2, c2) {
             p2.querySelector('#go').onclick = () => {
@@ -591,7 +839,7 @@ function settingsPanel() {
       });
       bind(panel, '[data-x="reset"]', async () => {
         close();
-        if (await confirmPanel({ title: 'Erase everything?', note: 'Every goal, day and setting on this device.', confirm: 'Erase', danger: true })) {
+        if (await confirmPanel({ title: 'Erase Everything?', note: 'Every goal, day and setting on this device.', confirm: 'Erase', danger: true })) {
           resetAll(); toast('Cleared');
         }
       });
@@ -602,9 +850,9 @@ function settingsPanel() {
 function rhythmPanel(i) {
   const r = state.settings.rhythm[i];
   openPanel({
-    kicker: DOW_LONG[i], title: 'School hours',
+    kicker: DOW_LONG[i], title: 'School Hours',
     body: `
-      <div class="lines">${line('Has school', { on: !!r.school, attrs: 'data-x="has"' })}</div>
+      <div class="lines">${line('Has School', { on: !!r.school, attrs: 'data-x="has"' })}</div>
       <div class="grid2 mt" id="tw" ${r.school ? '' : 'hidden'}>
         ${field('Starts', `<input type="time" class="input" id="st" value="${r.school?.start || '08:00'}">`)}
         ${field('Ends', `<input type="time" class="input" id="en" value="${r.school?.end || '15:00'}">`)}
@@ -633,7 +881,7 @@ export function capturePanel() {
   openPanel({
     title: 'Capture',
     body: `<input class="input" id="cp" data-autofocus placeholder="Anything" enterkeyhint="done">
-           <button class="btn accent wide" id="cg">Save to inbox</button>`,
+           <button class="btn accent wide" id="cg">Save To Inbox</button>`,
     onMount(panel, close) {
       const go = () => {
         const v = panel.querySelector('#cp').value.trim();
@@ -650,7 +898,7 @@ export function capturePanel() {
 export function tasksPanel() {
   const open = sortBy(state.tasks.filter((t) => !t.done), (t) => `${t.date ? '0' + t.date : '1'}${t.createdAt}`);
   openPanel({
-    kicker: 'Tasks', title: `${open.length} open`,
+    kicker: 'Tasks', title: `${open.length} Open`,
     body: `<div class="lines">${open.map((t) => line(t.title, {
       on: false, meta: t.date ? relDay(t.date) : 'Inbox', attrs: `data-t="${t.id}"` })).join('') || '<p class="empty">Nothing open</p>'}</div>`,
     onMount(panel) {
@@ -669,12 +917,12 @@ export function salvagePanel() {
   const proj = currentProject();
   const t = sleepTargets(key);
   openPanel({
-    kicker: 'Salvage', title: 'Shrink today',
+    kicker: 'Salvage', title: 'Shrink Today',
     body: `<p class="lede">Three moves and the day still counts.</p>
       <div class="lines">
-        ${line('Handle the most urgent thing', { on: !!d.salvageSteps.urgent, attrs: 'data-s="urgent"' })}
-        ${line(proj ? `Ten minutes on ${proj.name}` : 'Ten minutes on your project', { on: !!d.money, attrs: 'data-s="future"' })}
-        ${line(`Lights out at ${fmtTime(t.bedtime)}`, { on: !!d.bed, attrs: 'data-s="tonight"' })}
+        ${line('Handle The Most Urgent Thing', { on: !!d.salvageSteps.urgent, attrs: 'data-s="urgent"' })}
+        ${line(proj ? `Ten Minutes On ${proj.name}` : 'Ten Minutes On Your Project', { on: !!d.money, attrs: 'data-s="future"' })}
+        ${line(`Lights Out At ${fmtTime(t.bedtime)}`, { on: !!d.bed, attrs: 'data-s="tonight"' })}
       </div>`,
     onMount(panel) {
       bind(panel, '[data-s]', (el) => {
@@ -704,13 +952,7 @@ export function openStar(star) {
       const f = faithFor(K());
       return togglePanel({ kicker: 'Faith', title: f.label, fieldName: 'faith' });
     }
-    case 'school': {
-      const r = rhythmFor(K());
-      return togglePanel({
-        kicker: 'School', title: r?.school ? `${fmtTime(r.school.start)}–${fmtTime(r.school.end)}` : 'School',
-        fieldName: 'school'
-      });
-    }
+    case 'education': return educationPanel();
     case 'move': return movePanel();
     case 'sleep': return sleepPanel();
     case 'plan': return planPanel();

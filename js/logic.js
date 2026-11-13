@@ -380,3 +380,79 @@ export function areaRates(ref = todayKey(), window = 7) {
   }
   return rows.filter((r) => r.of > 0).sort((a, b) => (a.hit / a.of) - (b.hit / b.of));
 }
+
+/* ---------------- reminders ----------------
+   Every N days (counted from when you last did it), every N weeks on chosen
+   days, or a one-off date. A reminder carries over when missed rather than
+   quietly resetting. */
+
+export function lastDueOn(r, key) {
+  if (r.mode === 'once') return r.due && r.due <= key ? r.due : null;
+
+  if (r.mode === 'weekly') {
+    const every = Math.max(1, r.every || 1);
+    const days = r.days?.length ? r.days : [0];
+    const anchor = r.anchor || r.createdKey || key;
+    for (let i = 0; i <= every * 7 + 7; i++) {
+      const d = addDays(key, -i);
+      if (!days.includes(dow(d))) continue;
+      const weeks = Math.floor(daysBetween(weekKeyOf(anchor), weekKeyOf(d)) / 7);
+      if (weeks >= 0 && weeks % every === 0) return d;
+    }
+    return null;
+  }
+
+  const every = Math.max(1, r.every || 1);
+  const base = r.lastDone || r.createdKey;
+  if (!base) return key;
+  if (!r.lastDone) return base <= key ? base : null;
+  const gap = daysBetween(base, key);
+  if (gap < every) return null;
+  return addDays(base, Math.floor(gap / every) * every);
+}
+
+export function reminderState(r, key = todayKey()) {
+  const due = lastDueOn(r, key);
+  const isDue = !!due && (!r.lastDone || r.lastDone < due);
+  return { due: isDue, dueOn: due, overdue: isDue && due ? daysBetween(due, key) : 0 };
+}
+
+export function dueReminders(key = todayKey(), area = undefined) {
+  return (state.reminders || [])
+    .filter((r) => area === undefined || r.area === area)
+    .map((r) => ({ r, s: reminderState(r, key) }))
+    .filter((x) => x.s.due)
+    .sort((a, b) => b.s.overdue - a.s.overdue);
+}
+
+export function markReminderDone(r, key = todayKey()) {
+  if (r.mode === 'once') { r.lastDone = key; r.done = true; }
+  else r.lastDone = key;
+}
+
+export function reminderRule(r) {
+  const n = Math.max(1, r.every || 1);
+  if (r.mode === 'once') return r.due ? `Once · ${r.due}` : 'Once';
+  if (r.mode === 'interval') return n === 1 ? 'Every day' : `Every ${n} days`;
+  const names = (r.days?.length ? r.days : [0]).map((d) => DOW_LONG[d]).join(', ');
+  return n === 1 ? `Every ${names}` : n === 2 ? `Every other ${names}` : `Every ${n} weeks on ${names}`;
+}
+
+/* ---------------- urgency ----------------
+   Which stars should show spikes: something inside is due, overdue, or about
+   to be missed. */
+
+export function urgentStars(key = todayKey(), now = new Date()) {
+  const urgent = new Set();
+
+  for (const { r } of dueReminders(key)) {
+    if (r.area) urgent.add(r.area === 'christian' ? 'faith' : r.area);
+    else urgent.add('must');
+  }
+
+  // Tomorrow unplanned, and the evening is getting on.
+  const t = sleepTargets(key);
+  if (nowMin(now) >= toMin(t.windDown) - 150 && !getDay(addDays(key, 1)).mustId) urgent.add('plan');
+
+  return urgent;
+}

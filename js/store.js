@@ -2,10 +2,10 @@
    One versioned object in localStorage. Everything the app knows lives here,
    which keeps a future cloud sync to a single read/write seam. */
 
-import { uid, todayKey } from './util.js';
+import { uid, todayKey, weekKeyOf } from './util.js';
 
 const KEY = 'personal-os';
-const SCHEMA = 3;
+const SCHEMA = 4;
 
 export const CATS = {
   money:  { label: 'Business', emoji: '💼', color: 'var(--money)' },
@@ -104,6 +104,11 @@ function defaults() {
     goals: [],
     projects: [],
     tasks: [],
+    /* Recurring or one-off upkeep. An area tag makes the matching star spiky
+       while something is due. */
+    reminders: [],
+    /* Things learned outside school, and when. */
+    learned: [],
     days: {},   // key -> day record
     weeks: {},  // sunday key -> week record
     focus: []   // completed focus sessions
@@ -165,6 +170,8 @@ function migrate(raw) {
     goals: raw.goals || [],
     projects: raw.projects || [],
     tasks: raw.tasks || [],
+    reminders: raw.reminders || [],
+    learned: raw.learned || [],
     days: raw.days || {},
     weeks: raw.weeks || {},
     focus: raw.focus || []
@@ -314,6 +321,44 @@ export function deleteProject(id) {
 
 export const currentProject = () =>
   state.projects.find((p) => p.id === state.settings.currentProjectId) || null;
+
+/* ---------------- reminders & learning ---------------- */
+
+export const AREAS = ['business', 'christian', 'education', 'training', 'sleep'];
+
+export function newReminder(patch = {}) {
+  const r = {
+    id: uid(),
+    label: '',
+    area: null,                 // which star lights up when it's due
+    mode: 'interval',           // 'interval' | 'weekly' | 'once'
+    every: 7,
+    days: [],
+    due: null,                  // 'once' only
+    anchor: weekKeyOf(todayKey()),
+    lastDone: null,
+    createdKey: todayKey(),
+    ...patch
+  };
+  state.reminders.push(r);
+  return r;
+}
+
+export const reminderById = (id) => state.reminders.find((r) => r.id === id) || null;
+
+export function deleteReminder(id) {
+  state.reminders = state.reminders.filter((r) => r.id !== id);
+}
+
+export function newLearned(patch = {}) {
+  const l = { id: uid(), title: '', note: '', at: todayKey(), createdAt: Date.now(), ...patch };
+  state.learned.unshift(l);
+  return l;
+}
+
+export function deleteLearned(id) {
+  state.learned = state.learned.filter((l) => l.id !== id);
+}
 
 /* ---------------- export / import ---------------- */
 

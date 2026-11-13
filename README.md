@@ -14,10 +14,19 @@ star to open it, tap empty space for the read-out.
 | **Focus** | The one thing today. Largest, centre, calm red. |
 | **Secondary** | Up to two. Good if they happen, never at the focus's expense. |
 | **Business** | The current project, a one-tap work log, the last seven days, a learning list. |
-| **Faith / School / Train / Sleep** | The day's commitments. Each lights up when held. |
+| **Christian / Education / Training / Sleep** | The day's commitments. Each lights up when held. |
 | **Tomorrow** | The nightly ritual: one focus, up to two secondary, anything unusual. |
 | **This week** | The week's one goal, training and social rhythm, the weekly reset. |
 | **Life** | Priorities in order, the goal under each, and the daily and weekly cadence that gets you there. |
+
+**Education** holds school for the day, a log of what you've learned outside it
+and when, and any reminders tagged to it.
+
+A star grows **spikes** when something inside it is due or overdue — a reminder
+you've missed, or Tomorrow still unplanned late in the evening.
+
+Five tiny tabs sit at the bottom. They aren't pages: tapping one spins the globe
+to centre that star, as a shortcut for dragging.
 | **Settings** | Sleep times, faith schedule, training targets, school hours, data. |
 
 The corner button holds only what doesn't belong on the globe: capture, the
@@ -41,6 +50,37 @@ numbers behind the colour and the one area worth pushing this week.
 - **No points, levels, streaks or scores.** The sky brightens as you act; that's the whole reward.
 - **Nothing appears twice.** Each fact has exactly one home.
 - **No commentary.** The app shows what is true and stays quiet.
+
+## Reminders
+
+Three shapes: a one-off date, every N days (counted from when you last did it),
+or every N weeks on chosen days. A reminder can be tagged to a star, which then
+grows spikes while it's due. Missing one carries it over rather than resetting
+it. Managed under Settings, or added straight from Education.
+
+## The nightly push
+
+The browser can subscribe to a push, but something server-side has to send it.
+A scheduled GitHub Action does that — no extra hosting.
+
+**Setup, once:**
+
+1. Install the app to the Home Screen (iOS only allows notifications from an
+   installed PWA, 16.4+).
+2. **Settings → Nightly Push → Turn On**, then copy the subscription it shows.
+3. In the repo, **Settings → Secrets and variables → Actions**, add:
+   - `PUSH_SUBSCRIPTION` — what you just copied
+   - `VAPID_SUBJECT` — `mailto:` and your email
+   - `VAPID_PRIVATE_KEY` — the private half of the key in `push-config.json`
+4. Run **Actions → Nightly planning push → Run workflow** to test it.
+
+`scripts/vapid.mjs` generates a fresh key pair if you'd rather make your own —
+put the public half in `push-config.json` and the private half in the secret.
+
+The schedule is `15 3 * * *` (UTC) in `.github/workflows/nightly-push.yml`,
+which is 10:15 PM US Eastern in winter. GitHub cron has no timezone and is
+best-effort, so it can fire a few minutes late and needs shifting when the
+clocks change.
 
 ## Install it on an iPhone
 
@@ -77,14 +117,17 @@ css/app.css             the whole design system
 sw.js                   offline cache (network-first, cache as fallback)
 js/
   app.js                bootstrap, the corner menu, service worker
-  sky.js                sphere projection, input, painting
+  sky.js                sphere projection, input, constellation lines, painting
   stars.js              what sits on the globe, ordered by importance
   panels.js             every panel behind every star
   store.js              state, persistence, migrations
   logic.js              the rules: standards, sleep, training, mood, areas
   util.js               dates (3 AM rollover, Sunday-led weeks), formatting
   ui.js                 panels, toasts, confirms, line/dot builders
+push-config.json        the VAPID public key (safe to commit)
 scripts/make_icons.py   regenerates the icons (pure stdlib)
+scripts/vapid.mjs       generates a VAPID key pair
+scripts/send-push.mjs   what the nightly workflow runs
 ```
 
 Index 0 of the star list sits exactly on the pole facing the camera; the rest

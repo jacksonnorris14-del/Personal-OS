@@ -1,5 +1,5 @@
 /* Personal OS service worker — offline-first, self-updating. */
-const VERSION = 'pos-v5';
+const VERSION = 'pos-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const ASSETS = [
   './js/logic.js',
   './js/util.js',
   './js/ui.js',
+  './push-config.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
@@ -73,4 +74,34 @@ self.addEventListener('fetch', (e) => {
       })
       .catch(() => caches.match(req))
   );
+});
+
+/* ---------- push ---------- */
+
+self.addEventListener('push', (e) => {
+  let d = { title: 'Set Tomorrow', body: 'One focus. Takes a minute.', url: './index.html#plan' };
+  try { if (e.data) d = { ...d, ...e.data.json() }; } catch { /* plain text payload */ }
+  e.waitUntil(self.registration.showNotification(d.title, {
+    body: d.body,
+    tag: d.tag || 'personal-os',
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    data: { url: d.url }
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const target = e.notification.data?.url || './index.html#plan';
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of all) {
+      if (c.url.includes(self.registration.scope)) {
+        await c.focus();
+        if ('navigate' in c) await c.navigate(target).catch(() => {});
+        return;
+      }
+    }
+    await self.clients.openWindow(target);
+  })());
 });
