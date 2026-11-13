@@ -25,6 +25,7 @@ export function spherePoints(n) {
 }
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2;
 const lerp = (a, b, t) => a + (b - a) * t;
 const mix = (c1, c2, t) => [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)];
 const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
@@ -83,7 +84,23 @@ export class Sky {
     requestAnimationFrame(this._loop);
   }
 
-  setStars(stars) { this.stars = stars; }
+  setStars(stars) {
+    this.stars = stars;
+    this.links = [];
+    // Join each star to its two nearest neighbours. Gives the globe a wire
+    // without drawing a grid over it.
+    const seen = new Set();
+    stars.forEach((a, i) => {
+      const near = stars.map((b, j) => ({ j, d: dist2(a.pos, b.pos) }))
+        .filter((x) => x.j !== i).sort((x, y) => x.d - y.d).slice(0, 2);
+      for (const n of near) {
+        const key = i < n.j ? `${i}-${n.j}` : `${n.j}-${i}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        this.links.push([i, n.j]);
+      }
+    });
+  }
   setMood(m) { this.mood = clamp(m, 0, 1); }
 
   _resize() {
@@ -149,14 +166,19 @@ export class Sky {
       if (this._pointers.size >= 2) {
         const [a, b] = [...this._pointers.values()];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (this._pinch0 > 0) this.zoom = clamp(this._zoom0 * (d / this._pinch0), MIN_ZOOM, MAX_ZOOM);
+        // dampened: a raw ratio made the globe leap between extremes
+        if (this._pinch0 > 0) {
+          const ratio = 1 + (d / this._pinch0 - 1) * 0.55;
+          this.zoom = clamp(this._zoom0 * ratio, MIN_ZOOM, MAX_ZOOM);
+        }
         return;
       }
-      const k = 0.0052 / Math.max(0.8, this.zoom * 0.7);
+      // Dragging down used to tilt the globe up — the axis was inverted.
+      const k = 0.0026 / Math.max(0.85, this.zoom * 0.7);
       this.yaw += dx * k;
-      this.pitch = clamp(this.pitch + dy * k, -1.05, 1.05);
-      this.vYaw = dx * k * 0.55;
-      this.vPitch = dy * k * 0.55;
+      this.pitch = clamp(this.pitch - dy * k, -1.05, 1.05);
+      this.vYaw = dx * k * 0.5;
+      this.vPitch = -dy * k * 0.5;
     });
 
     const end = (e) => {
@@ -175,7 +197,7 @@ export class Sky {
 
     cv.addEventListener('wheel', (e) => {
       e.preventDefault();
-      this.zoom = clamp(this.zoom * (1 - e.deltaY * 0.0012), MIN_ZOOM, MAX_ZOOM);
+      this.zoom = clamp(this.zoom * (1 - e.deltaY * 0.0006), MIN_ZOOM, MAX_ZOOM);
     }, { passive: false });
   }
 
@@ -302,9 +324,23 @@ export class Sky {
     ctx.arc(w / 2, h / 2, R, 0, 7);
     ctx.stroke();
 
-    const drawn = this.stars
-      .map((s) => ({ s, p: this._project(s.pos, R) }))
-      .sort((a, b) => a.p.z - b.p.z);
+    const proj = this.stars.map((s) => ({ s, p: this._project(s.pos, R) }));
+
+    // constellation lines — faint, and only where both ends face you
+    for (const [i, j] of this.links || []) {
+      const a = proj[i], b2 = proj[j];
+      if (!a || !b2) continue;
+      const t = Math.min(a.p.t, b2.p.t);
+      if (t < 0.3) continue;
+      ctx.strokeStyle = `rgba(186,204,232,${0.1 * Math.pow((t - 0.3) / 0.7, 1.2)})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(a.p.sx, a.p.sy);
+      ctx.lineTo(b2.p.sx, b2.p.sy);
+      ctx.stroke();
+    }
+
+    const drawn = [...proj].sort((a, b) => a.p.z - b.p.z);
 
     for (const { s, p } of drawn) this._star(s, p, now);
     this._labels(drawn);
@@ -314,7 +350,8 @@ export class Sky {
     const { ctx } = this;
     const t = p.t;
     if (t < 0.02) return;
-    const vis = Math.pow(t, 0.85);
+    // Stronger falloff than before: what's in front should clearly win.
+    const vis = s.primary ? Math.pow(t, 0.5) : Math.pow(t, 1.5);
     const size = s.size * p.scale * (0.55 + 0.45 * t);
     const col = s.color;
     const done = s.done === true;
@@ -324,28 +361,45 @@ export class Sky {
     const rad = size * breathe;
 
     // glow
-    const gl = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, rad * (done ? 5.5 : 4.2));
-    gl.addColorStop(0, rgba(col, 0.42 * vis));
-    gl.addColorStop(0.4, rgba(col, 0.12 * vis));
+    const reach = rad * (s.primary ? 6.5 : done ? 5.5 : 4.2);
+    const gl = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, reach);
+    gl.addColorStop(0, rgba(col, (s.primary ? 0.6 : 0.42) * vis));
+    gl.addColorStop(0.4, rgba(col, (s.primary ? 0.18 : 0.12) * vis));
     gl.addColorStop(1, rgba(col, 0));
     ctx.fillStyle = gl;
     ctx.beginPath();
-    ctx.arc(p.sx, p.sy, rad * (done ? 5.5 : 4.2), 0, 7);
+    ctx.arc(p.sx, p.sy, reach, 0, 7);
     ctx.fill();
 
     // core
     const core = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, rad);
-    const white = mix(col, [255, 255, 255], done ? 0.8 : 0.55);
-    core.addColorStop(0, rgba(white, (done ? 0.98 : 0.86) * vis));
-    core.addColorStop(0.55, rgba(col, 0.85 * vis));
+    const white = mix(col, [255, 255, 255], s.primary ? 0.9 : done ? 0.8 : 0.5);
+    core.addColorStop(0, rgba(white, (s.primary ? 1 : done ? 0.98 : 0.8) * vis));
+    core.addColorStop(s.primary ? 0.42 : 0.55, rgba(col, (s.primary ? 1 : 0.8) * vis));
     core.addColorStop(1, rgba(col, 0));
     ctx.fillStyle = core;
     ctx.beginPath();
     ctx.arc(p.sx, p.sy, rad, 0, 7);
     ctx.fill();
 
+    // spikes mark something due or overdue inside this star
+    if (s.urgent && t > 0.22) {
+      const n = 8;
+      const inner = rad * 1.9;
+      const outer = rad * (3.5 + Math.sin(now / 520) * 0.3);
+      ctx.strokeStyle = rgba(mix(col, [255, 255, 255], 0.3), 0.6 * vis);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const a2 = (i / n) * Math.PI * 2 + now / 7000;
+        ctx.moveTo(p.sx + Math.cos(a2) * inner, p.sy + Math.sin(a2) * inner);
+        ctx.lineTo(p.sx + Math.cos(a2) * outer, p.sy + Math.sin(a2) * outer);
+      }
+      ctx.stroke();
+    }
+
     // a thin ring marks something still open
-    if (pending && t > 0.3) {
+    if (pending && !s.urgent && t > 0.3) {
       ctx.strokeStyle = rgba(col, 0.3 * vis);
       ctx.lineWidth = 1;
       ctx.beginPath();

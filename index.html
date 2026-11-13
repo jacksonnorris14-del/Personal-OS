@@ -23,6 +23,8 @@
   <span></span><span></span><span></span>
 </button>
 
+<nav id="tabs" aria-label="Jump to"></nav>
+
 <div id="sheet"></div>
 <div id="toast" role="status"></div>
 
@@ -30,7 +32,7 @@
 // Build sentinel — index.html is always fetched fresh, app.js reports the build
 // it was compiled against. A mismatch means stale modules: clear and reload once.
 // BUMP THIS AND __POS_READY IN js/app.js TOGETHER ON EVERY RELEASE.
-window.__POS_BUILD = 5;
+window.__POS_BUILD = 6;
 addEventListener('load', function () {
   setTimeout(function () {
     if (window.__POS_READY === window.__POS_BUILD) return;

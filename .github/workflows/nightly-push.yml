@@ -1,0 +1,31 @@
+name: Nightly planning push
+
+# Sends one push asking you to set tomorrow. Requires three repo secrets:
+#   VAPID_PRIVATE_KEY  — from scripts/vapid.mjs, pairs with push-config.json
+#   VAPID_SUBJECT      — mailto:you@example.com
+#   PUSH_SUBSCRIPTION  — the JSON the app shows under Settings → Nightly Reminder
+#
+# 03:15 UTC is 10:15 PM US Eastern in winter (11:15 PM in summer — GitHub cron
+# has no timezone, so shift this when the clocks change). Actions cron is
+# best-effort and can run late by a few minutes.
+
+on:
+  schedule:
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install web-push@3.6.7 --no-save
+      - name: Send
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+        run: node scripts/send-push.mjs

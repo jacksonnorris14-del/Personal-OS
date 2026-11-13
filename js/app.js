@@ -1,14 +1,14 @@
 /* Bootstrap: the sky is the app. */
 
-import { state, subscribe } from './store.js';
+import { subscribe } from './store.js';
 import { todayKey } from './util.js';
 import { mood } from './logic.js';
 import { Sky } from './sky.js';
-import { buildStars } from './stars.js';
+import { buildStars, TABS } from './stars.js';
 import { openStar, statsPanel, capturePanel, tasksPanel, salvagePanel } from './panels.js';
 import { openPanel, closePanel, bind } from './ui.js';
 
-window.__POS_READY = 5;
+window.__POS_READY = 6;
 
 const sky = new Sky(document.getElementById('sky'), {
   onStar: (s) => openStar(s),
@@ -39,7 +39,15 @@ document.addEventListener('visibilitychange', () => {
   refresh();
 });
 
-/* The only chrome: one corner button for what doesn't belong on the globe. */
+/* Bottom tabs are shortcuts, not pages: each spins the globe to that star. */
+const tabBar = document.getElementById('tabs');
+tabBar.innerHTML = TABS.map((t) => `<button data-tab="${t.id}">${t.label}</button>`).join('');
+tabBar.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => {
+  try { navigator.vibrate?.(8); } catch {}
+  sky.focusStar(b.dataset.tab);
+}));
+
+/* The only other chrome: one corner button for what isn't on the globe. */
 document.getElementById('menu').addEventListener('click', () => {
   openPanel({
     title: 'More',
@@ -58,6 +66,12 @@ document.getElementById('menu').addEventListener('click', () => {
 });
 
 addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
+
+/* A push that opens straight onto tomorrow's planning. */
+if (location.hash === '#plan') {
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => { sky.focusStar('plan', 400); setTimeout(() => openStar({ panel: 'plan' }), 450); }, 500);
+}
 
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
