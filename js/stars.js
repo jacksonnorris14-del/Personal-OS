@@ -21,13 +21,23 @@ const C = {
   set:      [104, 112, 128]
 };
 
+/* Line icons, drawn to one weight so the row reads as a set. */
+const SVG = (inner, extra = '') =>
+  `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.25"
+        stroke-linecap="round" stroke-linejoin="round" ${extra}>${inner}</svg>`;
+
 /** Stars the bottom tabs can jump to. */
 export const TABS = [
-  { id: 'must', label: 'Today' },
-  { id: 'plan', label: 'Tomorrow' },
-  { id: 'business', label: 'Business' },
-  { id: 'education', label: 'Education' },
-  { id: 'life', label: 'Life' }
+  { id: 'must', label: 'Today',
+    icon: SVG('<circle cx="10" cy="10" r="6.3"/><circle cx="10" cy="10" r="1.7" fill="currentColor" stroke="none"/>') },
+  { id: 'plan', label: 'Tomorrow',
+    icon: SVG('<path d="M14.9 12.6A6.3 6.3 0 0 1 7.4 5.1a6.3 6.3 0 1 0 7.5 7.5z"/>') },
+  { id: 'business', label: 'Business',
+    icon: SVG('<path d="M3.6 13.6l4.1-4.1 2.9 2.9 5.8-5.8"/><path d="M12.6 6.6h3.8v3.8"/>') },
+  { id: 'education', label: 'Education',
+    icon: SVG('<path d="M10 6.4C8.4 5.2 6.6 4.8 4.5 4.9v9.5c2.1-.1 3.9.3 5.5 1.5 1.6-1.2 3.4-1.6 5.5-1.5V4.9c-2.1-.1-3.9.3-5.5 1.5z"/><path d="M10 6.4v9.5"/>') },
+  { id: 'life', label: 'Life',
+    icon: SVG('<circle cx="10" cy="10" r="1.9"/><ellipse cx="10" cy="10" rx="7.4" ry="3.3"/><ellipse cx="10" cy="10" rx="7.4" ry="3.3" transform="rotate(62 10 10)"/>') }
 ];
 
 export function buildStars(key = todayKey(), now = new Date()) {

@@ -8,7 +8,7 @@ import { buildStars, TABS } from './stars.js';
 import { openStar, statsPanel, capturePanel, tasksPanel, salvagePanel } from './panels.js';
 import { openPanel, closePanel, bind } from './ui.js';
 
-window.__POS_READY = 6;
+window.__POS_READY = 7;
 
 const sky = new Sky(document.getElementById('sky'), {
   onStar: (s) => openStar(s),
@@ -41,7 +41,8 @@ document.addEventListener('visibilitychange', () => {
 
 /* Bottom tabs are shortcuts, not pages: each spins the globe to that star. */
 const tabBar = document.getElementById('tabs');
-tabBar.innerHTML = TABS.map((t) => `<button data-tab="${t.id}">${t.label}</button>`).join('');
+tabBar.innerHTML = TABS.map((t) =>
+  `<button data-tab="${t.id}" aria-label="${t.label}">${t.icon}<span>${t.label}</span></button>`).join('');
 tabBar.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => {
   try { navigator.vibrate?.(8); } catch {}
   sky.focusStar(b.dataset.tab);
@@ -52,9 +53,9 @@ document.getElementById('menu').addEventListener('click', () => {
   openPanel({
     title: 'More',
     body: `<div class="lines">
-      <button class="line" data-m="capture"><span class="line-text"><span class="line-label">Capture</span></span></button>
-      <button class="line" data-m="tasks"><span class="line-text"><span class="line-label">Tasks</span></span></button>
-      <button class="line" data-m="salvage"><span class="line-text"><span class="line-label">Salvage today</span><span class="line-meta">When the day got away from you</span></span></button>
+      <button class="line" data-m="capture"><span class="line-text"><span class="line-label">Quick Note</span></span></button>
+      <button class="line" data-m="tasks"><span class="line-text"><span class="line-label">Task List</span></span></button>
+      <button class="line" data-m="salvage"><span class="line-text"><span class="line-label">Rescue Today</span></span></button>
     </div>`,
     onMount(panel, close) {
       bind(panel, '[data-m]', (el) => {

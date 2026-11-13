@@ -22,15 +22,19 @@ star to open it, tap empty space for the read-out.
 **Education** holds school for the day, a log of what you've learned outside it
 and when, and any reminders tagged to it.
 
-A star grows **spikes** when something inside it is due or overdue — a reminder
-you've missed, or Tomorrow still unplanned late in the evening.
+A star grows **spikes** when it wants attention: a reminder due or overdue,
+Tomorrow still unplanned late in the evening, or an area you have simply
+stopped showing up for. Neglect is measured over ten days and needs at least
+four real chances, so a quiet first week never triggers it. Only the two worst
+areas spike at once — if everything spikes, nothing does — and anything you've
+already handled today never spikes, whatever last week looked like.
 
-Five tiny tabs sit at the bottom. They aren't pages: tapping one spins the globe
-to centre that star, as a shortcut for dragging.
+Five tabs sit at the bottom, each with a line icon. They aren't pages: tapping
+one spins the globe to centre that star, as a shortcut for dragging.
 | **Settings** | Sleep times, faith schedule, training targets, school hours, data. |
 
-The corner button holds only what doesn't belong on the globe: capture, the
-task list, and salvage.
+The corner button holds only what doesn't belong on the globe: Quick Note,
+Task List, and Rescue Today.
 
 ## The colour of the sky
 
