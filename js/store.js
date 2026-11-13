@@ -2,10 +2,10 @@
    One versioned object in localStorage. Everything the app knows lives here,
    which keeps a future cloud sync to a single read/write seam. */
 
-import { uid, todayKey, weekKeyOf, addDays, dow } from './util.js';
+import { uid, todayKey } from './util.js';
 
 const KEY = 'personal-os';
-const SCHEMA = 2;
+const SCHEMA = 3;
 
 export const CATS = {
   money:  { label: 'Business', emoji: '💼', color: 'var(--money)' },
@@ -22,12 +22,6 @@ export const FAITH_KINDS = {
   church:   { label: 'Church',               emoji: '⛪' },
   group:    { label: 'Morning Bible Study',  emoji: '👥' }
 };
-
-/** The next time this weekday comes around (today counts if it matches). */
-function upcoming(weekday = 0) {
-  const t = todayKey();
-  return dow(t) === weekday ? t : addDays(weekKeyOf(t), weekday + 7);
-}
 
 function defaults() {
   return {
@@ -110,13 +104,6 @@ function defaults() {
     goals: [],
     projects: [],
     tasks: [],
-    /* Recurring upkeep. Only surfaces on the days it is actually due. */
-    reminders: [
-      { id: 'rm-linens', emoji: '🛏️', label: 'Change towel, pillowcase, floor mat',
-        mode: 'weekly', every: 2, days: [0], anchor: upcoming(0), lastDone: null, createdKey: todayKey() },
-      { id: 'rm-shampoo', emoji: '🚿', label: 'Shampoo hair',
-        mode: 'interval', every: 4, days: [], anchor: null, lastDone: null, createdKey: todayKey() }
-    ],
     days: {},   // key -> day record
     weeks: {},  // sunday key -> week record
     focus: []   // completed focus sessions
@@ -178,7 +165,6 @@ function migrate(raw) {
     goals: raw.goals || [],
     projects: raw.projects || [],
     tasks: raw.tasks || [],
-    reminders: Array.isArray(raw.reminders) ? raw.reminders : base.reminders,
     days: raw.days || {},
     weeks: raw.weeks || {},
     focus: raw.focus || []
@@ -328,31 +314,6 @@ export function deleteProject(id) {
 
 export const currentProject = () =>
   state.projects.find((p) => p.id === state.settings.currentProjectId) || null;
-
-/* ---------------- reminders ---------------- */
-
-export function newReminder(patch = {}) {
-  const r = {
-    id: uid(),
-    emoji: '🔁',
-    label: '',
-    mode: 'interval',   // 'interval' (every N days) | 'weekly' (every N weeks on chosen days)
-    every: 7,
-    days: [],
-    anchor: weekKeyOf(todayKey()),
-    lastDone: null,
-    createdKey: todayKey(),
-    ...patch
-  };
-  state.reminders.push(r);
-  return r;
-}
-
-export const reminderById = (id) => state.reminders.find((r) => r.id === id) || null;
-
-export function deleteReminder(id) {
-  state.reminders = state.reminders.filter((r) => r.id !== id);
-}
 
 /* ---------------- export / import ---------------- */
 
