@@ -8,7 +8,7 @@ import { buildStars, TABS } from './stars.js';
 import { openStar, statsPanel, capturePanel, tasksPanel, salvagePanel } from './panels.js';
 import { openPanel, closePanel, bind } from './ui.js';
 
-window.__POS_READY = 7;
+window.__POS_READY = 8;
 
 const sky = new Sky(document.getElementById('sky'), {
   onStar: (s) => openStar(s),

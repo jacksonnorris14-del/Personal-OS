@@ -67,19 +67,26 @@ it. Managed under Settings, or added straight from Education.
 The browser can subscribe to a push, but something server-side has to send it.
 A scheduled GitHub Action does that — no extra hosting.
 
+The signing keys are generated **on the phone**, in the app, using WebCrypto.
+No key ships with the app and none passes through anyone else's hands; the
+private half is shown once, for pasting into a repo secret, and is never stored.
+
 **Setup, once:**
 
 1. Install the app to the Home Screen (iOS only allows notifications from an
    installed PWA, 16.4+).
-2. **Settings → Nightly Push → Turn On**, then copy the subscription it shows.
-3. In the repo, **Settings → Secrets and variables → Actions**, add:
-   - `PUSH_SUBSCRIPTION` — what you just copied
+2. **Settings → Nightly Push → Make Keys**. Copy each of the two values.
+3. **Turn It On**, allow notifications, and copy the subscription it shows.
+4. In the repo, **Settings → Secrets and variables → Actions → New repository
+   secret**, add four:
+   - `VAPID_PUBLIC_KEY`
+   - `VAPID_PRIVATE_KEY`
+   - `PUSH_SUBSCRIPTION`
    - `VAPID_SUBJECT` — `mailto:` and your email
-   - `VAPID_PRIVATE_KEY` — the private half of the key in `push-config.json`
-4. Run **Actions → Nightly planning push → Run workflow** to test it.
+5. Run **Actions → Nightly planning push → Run workflow** to test it now rather
+   than waiting for the schedule.
 
-`scripts/vapid.mjs` generates a fresh key pair if you'd rather make your own —
-put the public half in `push-config.json` and the private half in the secret.
+Redo steps 3–4 if you reinstall the app: the subscription changes.
 
 The schedule is `15 3 * * *` (UTC) in `.github/workflows/nightly-push.yml`,
 which is 10:15 PM US Eastern in winter. GitHub cron has no timezone and is
@@ -128,9 +135,7 @@ js/
   logic.js              the rules: standards, sleep, training, mood, areas
   util.js               dates (3 AM rollover, Sunday-led weeks), formatting
   ui.js                 panels, toasts, confirms, line/dot builders
-push-config.json        the VAPID public key (safe to commit)
 scripts/make_icons.py   regenerates the icons (pure stdlib)
-scripts/vapid.mjs       generates a VAPID key pair
 scripts/send-push.mjs   what the nightly workflow runs
 ```
 
